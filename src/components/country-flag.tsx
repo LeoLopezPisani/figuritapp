@@ -6,6 +6,7 @@ interface CountryFlagProps {
 
 // Static mapping required by Metro Bundler for local assets
 const FLAG_ASSETS: Record<string, any> = {
+  FWC: require("../../assets/flags/fwc.png"),
   // Group A
   MEX: require("../../assets/flags/mx.png"),
   RSA: require("../../assets/flags/za.png"),
@@ -80,13 +81,13 @@ const FLAG_ASSETS: Record<string, any> = {
 };
 
 export function CountryFlag({ code }: CountryFlagProps) {
-  if (code === "FWC") {
-    return (
-      <View style={[styles.flagWrapper, styles.trophyBackground]}>
-        <Text style={styles.trophyText}>🏆</Text>
-      </View>
-    );
-  }
+  // if (code === "FWC") {
+  //   return (
+  //     <View style={[styles.flagWrapper, styles.trophyBackground]}>
+  //       <Text style={styles.trophyText}>🏆</Text>
+  //     </View>
+  //   );
+  // }
 
   if (!FLAG_ASSETS[code]) {
     return (

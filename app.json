@@ -2,7 +2,7 @@
   "expo": {
     "name": "FiguritApp 2026",
     "slug": "figuritapp",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "figuritapp",
@@ -20,7 +20,7 @@
         "backgroundImage": "./assets/images/icon.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "versionCode": 4,
+      "versionCode": 5,
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.figuritapp",
       "permissions": ["android.permission.CAMERA"]
