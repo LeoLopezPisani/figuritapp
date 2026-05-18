@@ -1,24 +1,29 @@
 {
   "expo": {
-    "name": "figuritapp",
+    "name": "FiguritApp 2026",
     "slug": "figuritapp",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "figuritapp",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/icon.png",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Necesitamos la cámara para escanear tus figuritas."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0f172a",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "versionCode": 2,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.figuritapp"
+      "package": "com.anonymous.figuritapp",
+      "permissions": ["android.permission.CAMERA"]
     },
     "web": {
       "output": "static",
@@ -47,6 +52,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "189179eb-18c0-4e14-b020-b12c5cd3f3ae"
+      }
     }
   }
 }

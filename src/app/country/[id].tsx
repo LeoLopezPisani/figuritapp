@@ -6,10 +6,11 @@ import {
   FlatList,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CountryFlag } from "../../components/country-flag";
+import { StickerItem } from "../../components/sticker-item";
 import {
   decrementSticker,
   getAlbumData,
@@ -18,7 +19,7 @@ import {
 } from "../../services/db";
 import { countryStyles as styles } from "../../styles/country.styles";
 
-type FilterType = "ALL" | "MISSING" | "DUPLICATES";
+type FilterType = "TODAS" | "FALTANTES" | "REPETIDAS";
 
 export default function CountryScreen() {
   const { id, profileId } = useLocalSearchParams<{
@@ -31,7 +32,7 @@ export default function CountryScreen() {
   const [isLoading, setIsLoading] = useState(true);
 
   // Nuevo estado para los filtros
-  const [activeFilter, setActiveFilter] = useState<FilterType>("ALL");
+  const [activeFilter, setActiveFilter] = useState<FilterType>("TODAS");
 
   const loadCountryData = async () => {
     if (!id || !profileId) return;
@@ -57,9 +58,9 @@ export default function CountryScreen() {
   const filteredStickers = useMemo(() => {
     let result = stickers;
 
-    if (activeFilter === "MISSING")
+    if (activeFilter === "FALTANTES")
       result = stickers.filter((s) => s.count === 0);
-    if (activeFilter === "DUPLICATES")
+    if (activeFilter === "REPETIDAS")
       result = stickers.filter((s) => s.count > 1);
 
     return result.sort((a, b) => {
@@ -132,48 +133,21 @@ export default function CountryScreen() {
   };
 
   const renderStickerItem = ({ item: sticker }: { item: Sticker }) => {
-    let backgroundColor = "#1e293b";
-    let borderColor = "#334155";
-    let textColor = "#64748b";
-
-    if (sticker.count === 1) {
-      backgroundColor = "#0ea5e9";
-      borderColor = "#0ea5e9";
-      textColor = "#ffffff";
-    } else if (sticker.count > 1) {
-      backgroundColor = "#10b981";
-      borderColor = "#10b981";
-      textColor = "#ffffff";
-    }
-
     return (
-      <TouchableOpacity
-        style={[styles.stickerContainer, { backgroundColor, borderColor }]}
-        onPress={() => handleStickerPress(sticker.id)}
-        onLongPress={() => handleStickerLongPress(sticker.id)}
-        delayLongPress={250}
-      >
-        <Text style={[styles.stickerCountryCode, { color: textColor }]}>
-          {id}
-        </Text>
-        <Text style={[styles.stickerNumber, { color: textColor }]}>
-          {sticker.number}
-        </Text>
-
-        {sticker.count > 1 && (
-          <View style={styles.badgeContainer}>
-            <Text style={styles.badgeText}>x{sticker.count}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
+      <StickerItem
+        sticker={sticker}
+        countryCode={id!}
+        onPress={handleStickerPress}
+        onLongPress={handleStickerLongPress}
+      />
     );
   };
 
   const renderEmptyState = () => (
     <View style={styles.emptyStateContainer}>
       <Text style={styles.emptyStateText}>
-        {activeFilter === "DUPLICATES"
-          ? "NO DUPLICATES YET"
+        {activeFilter === "REPETIDAS"
+          ? "NO REPETIDAS YET"
           : "YOU HAVE THEM ALL! 🎉"}
       </Text>
     </View>
@@ -207,51 +181,51 @@ export default function CountryScreen() {
         <TouchableOpacity
           style={[
             styles.filterBtn,
-            activeFilter === "ALL" && styles.filterBtnActive,
+            activeFilter === "TODAS" && styles.filterBtnActive,
           ]}
-          onPress={() => setActiveFilter("ALL")}
+          onPress={() => setActiveFilter("TODAS")}
         >
           <Text
             style={[
               styles.filterText,
-              activeFilter === "ALL" && styles.filterTextActive,
+              activeFilter === "TODAS" && styles.filterTextActive,
             ]}
           >
-            ALL
+            TODAS
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[
             styles.filterBtn,
-            activeFilter === "MISSING" && styles.filterBtnActive,
+            activeFilter === "FALTANTES" && styles.filterBtnActive,
           ]}
-          onPress={() => setActiveFilter("MISSING")}
+          onPress={() => setActiveFilter("FALTANTES")}
         >
           <Text
             style={[
               styles.filterText,
-              activeFilter === "MISSING" && styles.filterTextActive,
+              activeFilter === "FALTANTES" && styles.filterTextActive,
             ]}
           >
-            MISSING
+            FALTANTES
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[
             styles.filterBtn,
-            activeFilter === "DUPLICATES" && styles.filterBtnActive,
+            activeFilter === "REPETIDAS" && styles.filterBtnActive,
           ]}
-          onPress={() => setActiveFilter("DUPLICATES")}
+          onPress={() => setActiveFilter("REPETIDAS")}
         >
           <Text
             style={[
               styles.filterText,
-              activeFilter === "DUPLICATES" && styles.filterTextActive,
+              activeFilter === "REPETIDAS" && styles.filterTextActive,
             ]}
           >
-            DUPLICATES
+            REPETIDAS
           </Text>
         </TouchableOpacity>
       </View>

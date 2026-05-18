@@ -11,122 +11,25 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { CountryFlag } from "../components/country-flag";
+import { CountryCard } from "../components/country-card";
+import { useAlbumSync } from "../hooks/use-album-sync";
 import {
   Country,
   getAlbumData,
   incrementMultipleStickers,
-  pullCloudData,
-  seedUserAlbum,
 } from "../services/db";
 import { supabase } from "../services/supabase";
 import { homeStyles as styles } from "../styles/home.styles";
 
-interface SectionData {
-  title: string;
-  data: Array<{ key: string; country: Country }>;
-}
-
 export default function HomeScreen() {
-  const [sections, setSections] = useState<SectionData[]>([]);
+  // 1. Usamos el Hook para traer toda la info pesada
+  const { userId, isLoading, sections, stats, refreshData } = useAlbumSync();
+
   const [activeTab, setActiveTab] = useState("Intro");
-  const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalOwned: 0,
-    totalStickers: 0,
-    percentage: 0,
-  });
-
-  // NEW: Dynamic Authenticated User State from Supabase Secure Token
-  const [userId, setUserId] = useState<string | null>(null);
-
   const params = useLocalSearchParams<{ scannedIds?: string }>();
+
   const sectionListRef = useRef<SectionList>(null);
   const tabsListRef = useRef<FlatList>(null);
-
-  const loadAndProcessAlbum = async (authenticatedUid: string) => {
-    try {
-      let dbData = await getAlbumData(authenticatedUid);
-
-      // Edge Case: If the user is authenticated but has no SQLite slots yet (new device/fresh signup)
-      const hasStickersLoaded = Object.values(dbData).some(
-        (c) => c.stickers.length > 0,
-      );
-      if (!hasStickersLoaded) {
-        console.log(
-          `[HomeScreen] Hydrating clean SQLite structural matrix for user: ${authenticatedUid}`,
-        );
-        await seedUserAlbum(authenticatedUid);
-        dbData = await getAlbumData(authenticatedUid); // Re-fetch hydrated rows
-      }
-
-      let computedTotal = 0;
-      let computedOwned = 0;
-      const groupsMap: Record<string, any[]> = {};
-
-      Object.entries(dbData).forEach(([key, country]) => {
-        computedTotal += country.stickers.length;
-        computedOwned += country.stickers.filter((s) => s.count > 0).length;
-
-        if (!groupsMap[country.group]) groupsMap[country.group] = [];
-        groupsMap[country.group].push({ key, country });
-      });
-
-      const formattedSections: SectionData[] = Object.entries(groupsMap).map(
-        ([groupName, items]) => ({
-          title: groupName,
-          data: items.sort(
-            (a, b) => a.country.orderIndex - b.country.orderIndex,
-          ),
-        }),
-      );
-
-      formattedSections.sort((a, b) => {
-        if (a.title === "Intro") return -1;
-        if (b.title === "Intro") return 1;
-        return a.title.localeCompare(b.title);
-      });
-
-      setSections(formattedSections);
-      setStats({
-        totalOwned: computedOwned,
-        totalStickers: computedTotal,
-        percentage:
-          computedTotal > 0
-            ? Math.round((computedOwned / computedTotal) * 100)
-            : 0,
-      });
-    } catch (error) {
-      console.error("[HomeScreen] Error loading context metrics:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // 1. Mount Hook: Resolve secure authenticated user context
-  useEffect(() => {
-    const resolveUserSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.user) {
-        const uid = session.user.id;
-        setUserId(uid);
-
-        // 1. Primero cargamos lo que haya en local
-        await loadAndProcessAlbum(uid);
-
-        // 2. Intentamos traer datos frescos de la nube (Pull Sync)
-        try {
-          await pullCloudData(uid);
-          await loadAndProcessAlbum(uid);
-        } catch (e) {
-          console.log("Modo offline activo, trabajando con datos locales.");
-        }
-      }
-    };
-    resolveUserSession();
-  }, []);
 
   // 2. Scanner Hook tied to dynamic secure userId state
   useEffect(() => {
@@ -135,7 +38,7 @@ export default function HomeScreen() {
         const newIds = params.scannedIds!.split(",");
         try {
           await incrementMultipleStickers(userId, newIds);
-          await loadAndProcessAlbum(userId);
+          refreshData(); // Actualizamos vía el Hook en lugar de la vieja función local
         } catch (error) {
           console.error("[HomeScreen] Error executing batch append:", error);
         }
@@ -143,7 +46,7 @@ export default function HomeScreen() {
       processScannedStickers();
       router.setParams({ scannedIds: undefined });
     }
-  }, [params.scannedIds, userId]);
+  }, [params.scannedIds, userId, refreshData]);
 
   const handleTabPress = (title: string, index: number) => {
     setActiveTab(title);
@@ -224,42 +127,17 @@ export default function HomeScreen() {
   }: {
     item: { key: string; country: Country };
   }) => {
-    const { key, country } = item;
-    const total = country.stickers.length;
-    const owned = country.stickers.filter((s) => s.count > 0).length;
-    const missing = total - owned;
-
     return (
-      <TouchableOpacity
-        style={styles.countryCard}
-        // Secure Parameter passing: forward authenticated token owner reference downstream
-        onPress={() =>
+      <CountryCard
+        countryKey={item.key}
+        country={item.country}
+        onPress={(key) =>
           router.push({
             pathname: "/country/[id]",
             params: { id: key, profileId: userId },
           })
         }
-      >
-        <View style={styles.countryInfo}>
-          <CountryFlag code={key} />
-          <View>
-            <Text style={styles.countryName}>{country.name}</Text>
-            <Text style={styles.countrySub}>
-              {owned} of {total} collected
-            </Text>
-          </View>
-        </View>
-
-        <View
-          style={[styles.missingBadge, missing === 0 && styles.completedBadge]}
-        >
-          <Text
-            style={[styles.missingText, missing === 0 && styles.completedText]}
-          >
-            {missing === 0 ? "COMPLETE" : `${missing} LEFT`}
-          </Text>
-        </View>
-      </TouchableOpacity>
+      />
     );
   };
 
@@ -327,13 +205,16 @@ export default function HomeScreen() {
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
             <Text style={styles.statNumber}>
-              {stats.totalOwned}/{stats.totalStickers}
+              {stats.owned}/{stats.total}
             </Text>
             <Text style={styles.statLabel}>STICKERS</Text>
           </View>
           <View style={styles.statBox}>
             <Text style={[styles.statNumber, { color: "#0ea5e9" }]}>
-              {stats.percentage}%
+              {stats.total > 0
+                ? Math.round((stats.owned / stats.total) * 100)
+                : 0}
+              %
             </Text>
             <Text style={styles.statLabel}>PROGRESS</Text>
           </View>
