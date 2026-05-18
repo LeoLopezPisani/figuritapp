@@ -41,7 +41,8 @@
         {
           "cameraPermissionText": "Necesitamos la cámara para escanear tus figuritas."
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,
