@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Application from "expo-application";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -265,6 +266,10 @@ export default function LoginScreen() {
           </>
         )}
       </View>
+      <Text style={styles.versionText}>
+        v{Application.nativeApplicationVersion} (
+        {Application.nativeBuildVersion})
+      </Text>
     </SafeAreaView>
   );
 }

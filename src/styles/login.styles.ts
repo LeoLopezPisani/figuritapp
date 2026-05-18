@@ -80,4 +80,12 @@ export const loginStyles = StyleSheet.create({
     marginTop: 16,
     padding: 8,
   },
+  versionText: {
+    color: "#475569", // Un gris oscuro que se funde con tu fondo slate
+    fontSize: 12, // Bien chiquito
+    textAlign: "center",
+    marginTop: 24, // Para despegarlo del botón de login
+    marginBottom: 16, // Para que no quede pegado al borde del teléfono
+    letterSpacing: 1, // Le da ese toque técnico/elegante
+  },
 });
