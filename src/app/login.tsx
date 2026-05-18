@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Text,
   TextInput,
   TouchableOpacity,
@@ -103,11 +104,14 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.brandWrapper}>
-        <Text style={styles.brandTrophy}>🏆</Text>
+        <Image
+          source={require("../../assets/images/icon.png")}
+          style={styles.brandLogo}
+        />
         <Text style={styles.brandTitle}>FIGURITAPP</Text>
         <Text style={styles.brandSubtitle}>
           {step === "LOGIN"
-            ? "GESTOR SEGURO DE ÁLBUM"
+            ? "GESTOR SEGURO DEL ÁLBUM DEL MUNDIAL 2026"
             : "RECUPERACIÓN DE CUENTA"}
         </Text>
       </View>

@@ -19,9 +19,22 @@ export const homeStyles = StyleSheet.create({
   },
   topHeaderRow: {
     flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#061329",
+    height: 50,
+  },
+  headerRow: {
+    flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 16,
+  },
+  brandLogo: {
+    width: 40,
+    height: 40,
+    marginTop: 8,
+    marginBottom: 4,
   },
   mainTitle: {
     fontSize: 16,

@@ -8,7 +8,7 @@ export const loginStyles = StyleSheet.create({
     justifyContent: "center",
   },
   brandWrapper: { alignItems: "center", marginBottom: 40 },
-  brandTrophy: { fontSize: 48, marginBottom: 12 },
+  brandLogo: { width: 90, height: 90, marginBottom: 16, borderRadius: 18 },
   brandTitle: {
     fontSize: 24,
     fontWeight: "900",

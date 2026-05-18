@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   SectionList,
   Share,
   Text,
@@ -181,9 +182,15 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.globalHeader}>
+      <View style={styles.topHeaderRow}>
+        <Image
+          source={require("../../assets/images/icon.png")}
+          style={styles.brandLogo}
+        />
         <Text style={styles.mainTitle}>FIGURITAPP</Text>
-        <View style={styles.topHeaderRow}>
+      </View>
+      <View style={styles.globalHeader}>
+        <View style={styles.headerRow}>
           <Text style={styles.secondaryTitle}>PANINI - MUNDIAL 2026</Text>
           <View style={styles.headerActions}>
             <TouchableOpacity
