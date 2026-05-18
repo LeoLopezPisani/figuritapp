@@ -1,6 +1,11 @@
 // src/hooks/useAlbumSync.ts
 import { useCallback, useEffect, useState } from "react";
-import { Country, getAlbumData, pullCloudData } from "../services/db";
+import {
+  Country,
+  getAlbumData,
+  pullCloudData,
+  seedUserAlbum,
+} from "../services/db";
 import { supabase } from "../services/supabase";
 
 // Interfaz para la SectionList
@@ -15,10 +20,22 @@ export const useAlbumSync = () => {
   const [sections, setSections] = useState<AlbumSection[]>([]);
   const [stats, setStats] = useState({ total: 0, owned: 0 });
 
-  // Función interna para procesar SQLite
   const loadAndProcessAlbum = useCallback(async (uid: string) => {
     try {
-      const dbData = await getAlbumData(uid);
+      let dbData = await getAlbumData(uid);
+
+      // EL FIX CRÍTICO: Reincorporamos la hidratación de la base de datos
+      const hasStickersLoaded = Object.values(dbData).some(
+        (c) => c.stickers.length > 0,
+      );
+
+      if (!hasStickersLoaded) {
+        console.log(
+          `[useAlbumSync] Base de datos vacía. Generando matriz para: ${uid}`,
+        );
+        await seedUserAlbum(uid);
+        dbData = await getAlbumData(uid); // Volvemos a leer la base ya hidratada
+      }
 
       let total = 0;
       let owned = 0;
@@ -41,6 +58,13 @@ export const useAlbumSync = () => {
         ),
       }));
 
+      // Mantenemos el orden original (Intro primero)
+      formattedSections.sort((a, b) => {
+        if (a.title === "Intro") return -1;
+        if (b.title === "Intro") return 1;
+        return a.title.localeCompare(b.title);
+      });
+
       setStats({ total, owned });
       setSections(formattedSections);
     } catch (error) {
@@ -59,13 +83,11 @@ export const useAlbumSync = () => {
       const uid = session.user.id;
       setUserId(uid);
 
-      // 1. Carga local instantánea
       await loadAndProcessAlbum(uid);
 
-      // 2. Sincronización en la nube (silenciosa)
       try {
         await pullCloudData(uid);
-        await loadAndProcessAlbum(uid); // Refresca por si bajó data nueva
+        await loadAndProcessAlbum(uid);
       } catch (e) {
         console.log("Modo offline, operando con caché local.");
       }
@@ -73,12 +95,10 @@ export const useAlbumSync = () => {
     setIsLoading(false);
   }, [loadAndProcessAlbum]);
 
-  // Ejecutar al montar el Hook
   useEffect(() => {
     initSync();
   }, [initSync]);
 
-  // Devolvemos las variables y una función para refrescar manualmente si se necesita
   return {
     userId,
     isLoading,

@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -21,8 +22,8 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  // --- LÓGICA DE LOGIN NORMAL ---
   const handleLogin = async () => {
     if (!email || !password)
       return Alert.alert("Error", "Completá todos los campos.");
@@ -78,7 +79,6 @@ export default function LoginScreen() {
 
     setLoading(true);
 
-    // 1. Verificamos el código (esto autentica al usuario internamente en Supabase)
     const { error } = await supabase.auth.verifyOtp({
       email,
       token: otpCode,
@@ -90,7 +90,6 @@ export default function LoginScreen() {
       return Alert.alert("Error", "Código inválido o expirado.");
     }
 
-    // 2. Como el código era válido, actualizamos a la nueva contraseña
     const { error: updateError } = await supabase.auth.updateUser({ password });
 
     if (updateError) {
@@ -98,11 +97,9 @@ export default function LoginScreen() {
       Alert.alert("Error", "No se pudo guardar la nueva contraseña.");
     } else {
       Alert.alert("¡Éxito!", "Tu contraseña fue actualizada.");
-      // No apagamos el loading acá porque el RootLayout nos detecta logueados y nos manda al Home automático
     }
   };
 
-  // --- RENDERIZADO CONDICIONAL DE LA UI ---
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.brandWrapper}>
@@ -116,7 +113,6 @@ export default function LoginScreen() {
       </View>
 
       <View style={styles.formContainer}>
-        {/* Siempre pedimos el email */}
         <Text style={styles.inputLabel}>CORREO ELECTRÓNICO</Text>
         <TextInput
           style={styles.inputField}
@@ -128,20 +124,31 @@ export default function LoginScreen() {
           keyboardType="email-address"
         />
 
-        {/* SI ESTAMOS LOGUEANDO */}
         {step === "LOGIN" && (
           <>
             <Text style={[styles.inputLabel, { marginTop: 16 }]}>
               CONTRASEÑA
             </Text>
-            <TextInput
-              style={styles.inputField}
-              placeholder="••••••••"
-              placeholderTextColor="#475569"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
+            <View style={{ position: "relative", justifyContent: "center" }}>
+              <TextInput
+                style={[styles.inputField, { paddingRight: 40 }]} // Espacio extra a la derecha para que el texto no pise al ojito
+                placeholder="••••••••"
+                placeholderTextColor="#475569"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword} // Acá está la magia
+              />
+              <TouchableOpacity
+                style={{ position: "absolute", right: 12 }}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <Ionicons
+                  name={showPassword ? "eye-off" : "eye"}
+                  size={20}
+                  color="#94a3b8"
+                />
+              </TouchableOpacity>
+            </View>
 
             {loading ? (
               <ActivityIndicator
@@ -173,7 +180,6 @@ export default function LoginScreen() {
           </>
         )}
 
-        {/* SI ESTAMOS PIDIENDO EL CÓDIGO */}
         {step === "FORGOT_PASSWORD" && (
           <View style={styles.actionsWrapper}>
             {loading ? (
@@ -194,7 +200,6 @@ export default function LoginScreen() {
           </View>
         )}
 
-        {/* SI ESTAMOS INGRESANDO EL CÓDIGO Y NUEVA CONTRASEÑA */}
         {step === "RESET_PASSWORD" && (
           <>
             <Text style={[styles.inputLabel, { marginTop: 16 }]}>
@@ -213,14 +218,26 @@ export default function LoginScreen() {
             <Text style={[styles.inputLabel, { marginTop: 16 }]}>
               NUEVA CONTRASEÑA
             </Text>
-            <TextInput
-              style={styles.inputField}
-              placeholder="••••••••"
-              placeholderTextColor="#475569"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
+            <View style={{ position: "relative", justifyContent: "center" }}>
+              <TextInput
+                style={[styles.inputField, { paddingRight: 40 }]} // Espacio extra a la derecha para que el texto no pise al ojito
+                placeholder="••••••••"
+                placeholderTextColor="#475569"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword} // Acá está la magia
+              />
+              <TouchableOpacity
+                style={{ position: "absolute", right: 12 }}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <Ionicons
+                  name={showPassword ? "eye-off" : "eye"}
+                  size={20}
+                  color="#94a3b8"
+                />
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.actionsWrapper}>
               {loading ? (

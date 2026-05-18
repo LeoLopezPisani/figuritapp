@@ -14,6 +14,8 @@ import {
   useCameraDevice,
   useCameraPermission,
 } from "react-native-vision-camera";
+import { OCR_DICTIONARY, STICKER_REGEX } from "../constants/scanner";
+import { scannerStyles as styles } from "../styles/scanner.styles";
 
 export default function ScannerScreen() {
   const { hasPermission, requestPermission } = useCameraPermission();
@@ -47,23 +49,47 @@ export default function ScannerScreen() {
 
       const upperCaseText = result.text.toUpperCase();
 
-      // 3. RegEx filtering matching 3 letters + space? + numbers (1 to 20 range)
-      const matches = upperCaseText.match(
-        /\b[A-Z]{3}\s*(?:[1-9]|1[0-9]|20)\b/g,
-      );
+      const matches = upperCaseText.match(STICKER_REGEX);
 
       if (!matches || matches.length === 0) {
         Alert.alert(
           "No Stickers Found",
-          `Text read:\n"${result.text}"\n\nIt does not match any code within the 1-20 range.`,
+          `Text read:\n"${result.text}"\n\nIt does not match any code within the 00-20 range.`,
         );
         return;
       }
 
-      // 4. Normalize codes format (e.g., "ARG 10" -> "ARG_10")
-      const cleanedCodes = matches.map((code) => code.replace(/\s+/g, "_"));
+      // 4. Normalize codes format and apply OCR Dictionary/Blacklist
+      const validStickers = new Set<string>();
 
-      // 5. Success prompt sending data back to Home
+      matches.forEach((match) => {
+        // Remove inner spaces
+        const cleanMatch = match.replace(/\s+/g, "");
+
+        // Extract prefix (first 3 chars) and number
+        const prefix = cleanMatch.substring(0, 3);
+        const num = cleanMatch.substring(3);
+
+        // Map through dictionary fixes
+        const finalPrefix = OCR_DICTIONARY[prefix] || prefix;
+
+        // Ignore blacklisted items
+        if (finalPrefix !== "IGNORE") {
+          validStickers.add(`${finalPrefix}_${num}`);
+        }
+      });
+
+      const cleanedCodes = Array.from(validStickers);
+
+      // Edge case: matches were found but all were blacklisted (e.g., only "CUP 20")
+      if (cleanedCodes.length === 0) {
+        Alert.alert(
+          "No Stickers Found",
+          `Text read:\n"${result.text}"\n\nCodes detected were ignored by the system. Try adjusting the angle or lighting for a clearer scan.`,
+        );
+        return;
+      }
+
       Alert.alert("Stickers Detected!", `Found: ${cleanedCodes.join(", ")}`, [
         {
           text: "Add to Album",
@@ -83,7 +109,6 @@ export default function ScannerScreen() {
     }
   };
 
-  // Cyber Dark Theme for the Permissions Screen fallback
   if (!hasPermission) {
     return (
       <View style={styles.centerContainer}>
@@ -97,7 +122,6 @@ export default function ScannerScreen() {
     );
   }
 
-  // Cyber Dark Theme for the Missing Camera Screen fallback
   if (device == null) {
     return (
       <View style={styles.centerContainer}>
@@ -167,159 +191,3 @@ export default function ScannerScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  mainContainer: { flex: 1, backgroundColor: "#0f172a" },
-  centerContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#0f172a",
-  },
-  infoText: {
-    fontSize: 14,
-    color: "#94a3b8",
-    fontWeight: "800",
-    letterSpacing: 1,
-  },
-
-  // Tactical HUD Frame
-  hudOverlay: {
-    position: "absolute",
-    top: "25%",
-    alignSelf: "center",
-    backgroundColor: "rgba(30, 41, 59, 0.75)", // Translucent Slate 800
-    borderWidth: 1,
-    borderColor: "rgba(14, 165, 233, 0.3)", // Soft Cyan Glow
-    paddingVertical: 24,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    alignItems: "center",
-    width: "80%",
-    height: 200,
-    justifyContent: "center",
-  },
-  hudTitle: {
-    color: "#0ea5e9",
-    fontSize: 14,
-    fontWeight: "900",
-    letterSpacing: 1.5,
-  },
-  hudSubtitle: {
-    color: "#94a3b8",
-    fontSize: 11,
-    marginTop: 8,
-    textAlign: "center",
-    fontWeight: "600",
-    lineHeight: 16,
-  },
-
-  // Custom Targeting Reticle Corners (Cyber Aesthetic)
-  reticleCornerTL: {
-    position: "absolute",
-    top: 10,
-    left: 10,
-    width: 16,
-    height: 16,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderColor: "#0ea5e9",
-  },
-  reticleCornerTR: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    width: 16,
-    height: 16,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-    borderColor: "#0ea5e9",
-  },
-  reticleCornerBL: {
-    position: "absolute",
-    bottom: 10,
-    left: 10,
-    width: 16,
-    height: 16,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-    borderColor: "#0ea5e9",
-  },
-  reticleCornerBR: {
-    position: "absolute",
-    bottom: 10,
-    right: 10,
-    width: 16,
-    height: 16,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-    borderColor: "#0ea5e9",
-  },
-
-  // Loading Overlay
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(15, 23, 42, 0.95)", // Deep solid Slate 900
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    color: "#ffffff",
-    marginTop: 20,
-    fontSize: 14,
-    fontWeight: "900",
-    letterSpacing: 2,
-  },
-  loadingSubtext: {
-    color: "#64748b",
-    fontSize: 12,
-    marginTop: 6,
-    fontWeight: "600",
-  },
-
-  // Controls Area
-  bottomControls: {
-    position: "absolute",
-    bottom: 50,
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 32,
-  },
-  cancelButton: {
-    position: "absolute",
-    left: 40,
-    backgroundColor: "rgba(30, 41, 59, 0.8)",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#334155",
-  },
-  cancelButtonText: {
-    color: "#94a3b8",
-    fontWeight: "800",
-    fontSize: 11,
-    letterSpacing: 1,
-  },
-
-  // Tactical Capture Shutter (Centered correctly)
-  captureButton: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    borderWidth: 4,
-    borderColor: "#0ea5e9", // Cyber Cyan ring
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "transparent",
-  },
-  captureButtonInner: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    backgroundColor: "#0ea5e9",
-  },
-});
