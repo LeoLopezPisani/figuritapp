@@ -268,7 +268,7 @@ export default function LoginScreen() {
       </View>
       <Text style={styles.versionText}>
         v{Application.nativeApplicationVersion} (
-        {Application.nativeBuildVersion})
+        {Application.nativeBuildVersion}) — by [LP Bros] 💻 Cowabunga!
       </Text>
     </SafeAreaView>
   );

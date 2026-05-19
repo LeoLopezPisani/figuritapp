@@ -2,7 +2,9 @@
   "expo": {
     "name": "FiguritApp 2026",
     "slug": "figuritapp",
-    "version": "1.2.1",
+    "version": "2.0.0",
+    "owner": "poelozel",
+    "githubUrl": "https://github.com/LeoLopezPisani/figuritapp", // Si querés asociar tu repositorio
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "figuritapp",
@@ -20,7 +22,7 @@
         "backgroundImage": "./assets/images/icon.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "versionCode": 5,
+      "versionCode": 7,
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.figuritapp",
       "permissions": ["android.permission.CAMERA"]

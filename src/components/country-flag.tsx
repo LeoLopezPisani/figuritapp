@@ -35,13 +35,13 @@ const FLAG_ASSETS: Record<string, any> = {
   GER: require("../../assets/flags/de.png"),
   CUW: require("../../assets/flags/cw.png"),
   CIV: require("../../assets/flags/ci.png"),
-  ECA: require("../../assets/flags/ec.png"),
+  ECU: require("../../assets/flags/ec.png"),
 
   // Group F
   NED: require("../../assets/flags/nl.png"),
   JPN: require("../../assets/flags/jp.png"),
-  TUN: require("../../assets/flags/tn.png"),
   SWE: require("../../assets/flags/se.png"),
+  TUN: require("../../assets/flags/tn.png"),
 
   // Group G
   BEL: require("../../assets/flags/be.png"),
@@ -63,7 +63,7 @@ const FLAG_ASSETS: Record<string, any> = {
 
   // Group J
   ARG: require("../../assets/flags/ar.png"),
-  DZA: require("../../assets/flags/dz.png"),
+  ALG: require("../../assets/flags/dz.png"),
   AUT: require("../../assets/flags/at.png"),
   JOR: require("../../assets/flags/jo.png"),
 
@@ -81,14 +81,6 @@ const FLAG_ASSETS: Record<string, any> = {
 };
 
 export function CountryFlag({ code }: CountryFlagProps) {
-  // if (code === "FWC") {
-  //   return (
-  //     <View style={[styles.flagWrapper, styles.trophyBackground]}>
-  //       <Text style={styles.trophyText}>🏆</Text>
-  //     </View>
-  //   );
-  // }
-
   if (!FLAG_ASSETS[code]) {
     return (
       <View style={[styles.flagWrapper, styles.fallbackBackground]}>

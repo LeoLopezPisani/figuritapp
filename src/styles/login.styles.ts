@@ -3,12 +3,17 @@ import { StyleSheet } from "react-native";
 export const loginStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0f172a",
+    backgroundColor: "#09172a",
     paddingHorizontal: 24,
     justifyContent: "center",
   },
   brandWrapper: { alignItems: "center", marginBottom: 40 },
-  brandLogo: { width: 90, height: 90, marginBottom: 16, borderRadius: 18 },
+  brandLogo: {
+    width: 90,
+    height: 90,
+    marginBottom: 16,
+    borderRadius: 18,
+  },
   brandTitle: {
     fontSize: 24,
     fontWeight: "900",

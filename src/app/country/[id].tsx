@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -8,9 +8,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { CountryFlag } from "../../components/country-flag";
 import { StickerItem } from "../../components/sticker-item";
+import { COUNTRY_METADATA } from "../../constants/countries";
 import {
   decrementSticker,
   getAlbumData,
@@ -22,6 +26,7 @@ import { countryStyles as styles } from "../../styles/country.styles";
 type FilterType = "TODAS" | "FALTANTES" | "REPETIDAS";
 
 export default function CountryScreen() {
+  const insets = useSafeAreaInsets();
   const { id, profileId } = useLocalSearchParams<{
     id: string;
     profileId: string;
@@ -31,29 +36,37 @@ export default function CountryScreen() {
   const [countryName, setCountryName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
-  // Nuevo estado para los filtros
   const [activeFilter, setActiveFilter] = useState<FilterType>("TODAS");
 
-  const loadCountryData = async () => {
-    if (!id || !profileId) return;
-    try {
-      const allData = await getAlbumData(profileId);
-      const countryInfo = allData[id];
+  // 1. Armamos el array de códigos ordenados dinámicamente usando el orderIndex de tus metadatos
+  const orderedCountryCodes = useMemo(() => {
+    return Object.keys(COUNTRY_METADATA).sort(
+      (a, b) => COUNTRY_METADATA[a].orderIndex - COUNTRY_METADATA[b].orderIndex,
+    );
+  }, []);
 
-      if (countryInfo) {
-        setCountryName(countryInfo.name);
-        setStickers(countryInfo.stickers);
-      }
-    } catch (error) {
-      console.error("[CountryScreen] Error reading data from SQLite:", error);
-    } finally {
-      setIsLoading(false);
-    }
+  // 2. Buscamos el índice del país actual (ej: "MEX" -> índice 1)
+  const currentCountryIndex = orderedCountryCodes.indexOf(id || "");
+
+  // 3. Obtenemos los códigos del anterior y siguiente si existen
+  const previousCountryCode =
+    currentCountryIndex > 0
+      ? orderedCountryCodes[currentCountryIndex - 1]
+      : null;
+  const nextCountryCode =
+    currentCountryIndex < orderedCountryCodes.length - 1
+      ? orderedCountryCodes[currentCountryIndex + 1]
+      : null;
+
+  // 4. Función que maneja el reemplazo de pantalla
+  const handleNavigateToCountry = (targetCountryId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    router.replace({
+      pathname: "/country/[id]",
+      params: { id: targetCountryId, profileId },
+    });
   };
-
-  useEffect(() => {
-    loadCountryData();
-  }, [id, profileId]);
 
   const filteredStickers = useMemo(() => {
     let result = stickers;
@@ -69,6 +82,31 @@ export default function CountryScreen() {
       return numA - numB;
     });
   }, [stickers, activeFilter]);
+
+  const loadCountryData = useCallback(async () => {
+    if (!id || !profileId) return;
+    try {
+      // setIsLoading(true); //Optional: Show loading spinner when returning from scanner
+
+      const allData = await getAlbumData(profileId);
+      const countryInfo = allData[id];
+
+      if (countryInfo) {
+        setCountryName(countryInfo.name);
+        setStickers(countryInfo.stickers);
+      }
+    } catch (error) {
+      console.error("[CountryScreen] Error reading data from SQLite:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id, profileId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadCountryData();
+    }, [loadCountryData]),
+  );
 
   if (isLoading) {
     return (
@@ -147,8 +185,8 @@ export default function CountryScreen() {
     <View style={styles.emptyStateContainer}>
       <Text style={styles.emptyStateText}>
         {activeFilter === "REPETIDAS"
-          ? "NO REPETIDAS YET"
-          : "YOU HAVE THEM ALL! 🎉"}
+          ? "NO HAY REPETIDAS"
+          : "YA LAS CONSEGUISTE TODAS! 🎉"}
       </Text>
     </View>
   );
@@ -172,7 +210,7 @@ export default function CountryScreen() {
         </View>
 
         <Text style={styles.headerSubtitle}>
-          {ownedStickers} OF {totalStickers} COLLECTED
+          {ownedStickers} DE {totalStickers} OBTENIDAS
         </Text>
       </View>
 
@@ -239,14 +277,45 @@ export default function CountryScreen() {
         ListEmptyComponent={renderEmptyState}
       />
 
-      <TouchableOpacity
-        style={styles.floatingScanButton}
-        onPress={() =>
-          router.push({ pathname: "/scanner", params: { profileId } })
-        }
-      >
-        <Text style={styles.floatingScanButtonText}>📷 SCAN</Text>
-      </TouchableOpacity>
+      <View style={[styles.bottomActionBar, { bottom: insets.bottom + 30 }]}>
+        {/* Botón Anterior */}
+        <TouchableOpacity
+          style={[
+            styles.navButton,
+            !previousCountryCode && styles.navButtonDisabled,
+          ]}
+          disabled={!previousCountryCode}
+          onPress={() =>
+            previousCountryCode && handleNavigateToCountry(previousCountryCode)
+          }
+        >
+          <Text style={styles.navButtonText}>◀</Text>
+        </TouchableOpacity>
+
+        {/* Botón Central de Escaneo */}
+        <TouchableOpacity
+          style={styles.floatingScanButton}
+          onPress={() =>
+            router.push({ pathname: "/scanner", params: { profileId } })
+          }
+        >
+          <Text style={styles.floatingScanButtonText}>📷 ESCANEAR</Text>
+        </TouchableOpacity>
+
+        {/* Botón Siguiente */}
+        <TouchableOpacity
+          style={[
+            styles.navButton,
+            !nextCountryCode && styles.navButtonDisabled,
+          ]}
+          disabled={!nextCountryCode}
+          onPress={() =>
+            nextCountryCode && handleNavigateToCountry(nextCountryCode)
+          }
+        >
+          <Text style={styles.navButtonText}>▶</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
