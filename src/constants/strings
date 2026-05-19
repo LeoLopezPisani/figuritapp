@@ -1,0 +1,60 @@
+// src/constants/strings.ts
+
+export const STRINGS = {
+  // Login Screen
+  brandTitle: "FIGURITAPP",
+  brandSubtitle: "GESTOR SEGURO DE ÁLBUM 2026",
+  emailLabel: "CORREO ELECTRÓNICO",
+  emailPlaceholder: "Ingresá tu correo",
+  passwordLabel: "CONTRASEÑA",
+  passwordPlaceholder: "••••••••",
+  btnSignIn: "INICIAR SESIÓN",
+  btnSignUp: "CREAR CUENTA SEGURA",
+  loginErrors: {
+    emptyFields: "Por favor, completá todos los campos.",
+    weakPassword: "La contraseña debe tener al menos 6 caracteres.",
+    signUpSuccessTitle: "¡Cuenta Creada!",
+    signUpSuccessBody:
+      "Tu perfil está encriptado y listo. Ya podés iniciar sesión.",
+  },
+
+  // Home Screen
+  homeTitle: "PANINI MUNDIAL 2026",
+  btnShare: "📤 COMPARTIR",
+  btnLogout: "SALIR",
+  statsStickers: "FIGURITAS",
+  statsProgress: "PROGRESO",
+  badgeComplete: "COMPLETO",
+  badgeMissing: "FALTAN",
+  btnScan: "📷 ESCANEAR",
+  logoutConfirm: {
+    title: "Cerrar Sesión",
+    message: "¿Estás seguro que querés salir?",
+    cancel: "Cancelar",
+    confirm: "Salir",
+  },
+
+  // Country / Detail Screen
+  btnBack: "⬅ INICIO",
+  goBack: "VOLVER",
+  collectedOf: "DE",
+  collectedCollected: "COLECCIONADAS", // ej: "15 DE 20 COLECCIONADAS"
+  filterAll: "TODAS",
+  filterMissing: "FALTANTES",
+  filterDuplicates: "REPETIDAS",
+  emptyDuplicates: "NO HAY REPETIDAS AÚN",
+  emptyMissing: "¡YA LAS TENÉS TODAS! 🎉",
+  notFound: "Sección del país no encontrada",
+
+  // Share Generator
+  shareFormat: {
+    header: "🏆 *MI ÁLBUM MUNDIAL 2026* 🏆\n\n",
+    duplicatesTitle: "🟢 *TENGO REPETIDAS:*\n",
+    missingTitle: "🔴 *ME FALTAN:*\n",
+    noDuplicates: "Ninguna por ahora.\n\n",
+    albumComplete: "¡Álbum Completo! 🎉",
+    shareTitle: "Mis Figuritas 2026",
+    errorTitle: "Error",
+    errorBody: "No se pudo generar el listado.",
+  },
+};

@@ -1,5 +1,5 @@
 import TextRecognition from "@react-native-ml-kit/text-recognition";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -14,12 +14,26 @@ import {
   useCameraDevice,
   useCameraPermission,
 } from "react-native-vision-camera";
+import { OCR_DICTIONARY, STICKER_REGEX } from "../constants/scanner";
+import {
+  checkScannedStickers,
+  incrementMultipleStickers,
+} from "../services/db"; // <-- Tus nuevos poderes de SQLite
+import { scannerStyles as styles } from "../styles/scanner.styles";
+
+type ProcessingState = "IDLE" | "ANALYZING" | "SAVING";
 
 export default function ScannerScreen() {
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice("back");
   const cameraRef = useRef<Camera>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Recibimos el ID del usuario directamente desde la URL de la ruta
+  const { profileId } = useLocalSearchParams<{ profileId: string }>();
+
+  // Estado mejorado para darle feedback preciso al usuario
+  const [processingState, setProcessingState] =
+    useState<ProcessingState>("IDLE");
 
   useEffect(() => {
     if (!hasPermission) {
@@ -28,62 +42,127 @@ export default function ScannerScreen() {
   }, [hasPermission]);
 
   const handleCapture = async () => {
-    if (cameraRef.current == null || isProcessing) return;
+    if (cameraRef.current == null || processingState !== "IDLE") return;
 
     try {
-      setIsProcessing(true);
+      setProcessingState("ANALYZING");
 
       // 1. Capture high-res photo
       const photo = await cameraRef.current.takePhoto({ flash: "off" });
 
       // 2. Process local file path with ML Kit OCR
       const result = await TextRecognition.recognize(`file://${photo.path}`);
-      setIsProcessing(false);
+      setProcessingState("IDLE");
 
       if (!result.text || result.text.trim() === "") {
-        Alert.alert("Scanner", "No text was detected. Try focusing closer.");
-        return;
-      }
-
-      const upperCaseText = result.text.toUpperCase();
-
-      // 3. RegEx filtering matching 3 letters + space? + numbers (1 to 20 range)
-      const matches = upperCaseText.match(
-        /\b[A-Z]{3}\s*(?:[1-9]|1[0-9]|20)\b/g,
-      );
-
-      if (!matches || matches.length === 0) {
         Alert.alert(
-          "No Stickers Found",
-          `Text read:\n"${result.text}"\n\nIt does not match any code within the 1-20 range.`,
+          "Scanner",
+          "No se detectó ningún texto. Intentá ajustar el escaneo para una mejor captura.",
         );
         return;
       }
 
-      // 4. Normalize codes format (e.g., "ARG 10" -> "ARG_10")
-      const cleanedCodes = matches.map((code) => code.replace(/\s+/g, "_"));
+      const upperCaseText = result.text.toUpperCase();
+      const matches = upperCaseText.match(STICKER_REGEX);
 
-      // 5. Success prompt sending data back to Home
-      Alert.alert("Stickers Detected!", `Found: ${cleanedCodes.join(", ")}`, [
-        {
-          text: "Add to Album",
-          onPress: () => {
-            router.navigate({
-              pathname: "/",
-              params: { scannedIds: cleanedCodes.join(",") },
-            });
+      if (!matches || matches.length === 0) {
+        Alert.alert(
+          "No se encontraron figuritas",
+          `Texto leído:\n"${result.text}"\n\nNo se encontraron códigos válidos.`,
+        );
+        return;
+      }
+
+      const validStickers = new Set<string>();
+
+      matches.forEach((match) => {
+        const cleanMatch = match.replace(/\s+/g, "");
+        const prefix = cleanMatch.substring(0, 3);
+        const num = cleanMatch.substring(3);
+        const finalPrefix = OCR_DICTIONARY[prefix] || prefix;
+
+        if (finalPrefix !== "IGNORE") {
+          validStickers.add(`${finalPrefix}_${num}`);
+        }
+      });
+
+      const cleanedCodes = Array.from(validStickers);
+
+      if (cleanedCodes.length === 0) {
+        Alert.alert(
+          "No se encontraron figuritas válidas",
+          `Texto leído:\n"${result.text}"\n\nLos códigos detectados no son válidos. Intentá ajustar el ángulo o la iluminación.`,
+        );
+        return;
+      }
+
+      // 3. Confirmación y Lógica de Base de Datos Local
+      Alert.alert(
+        "¡Figuritas Detectadas!",
+        `${cleanedCodes.length} códigos encontrados -> ${cleanedCodes.join(", ")}`,
+        [
+          {
+            text: "Agregar al álbum",
+            onPress: async () => {
+              if (!profileId) {
+                Alert.alert("Error", "No se encontró la sesión del usuario.");
+                return;
+              }
+
+              try {
+                // Volvemos a prender el HUD, esta vez en modo "Guardando"
+                setProcessingState("SAVING");
+
+                // Evaluamos y guardamos usando las funciones que preparamos
+                const evaluation = await checkScannedStickers(
+                  profileId,
+                  cleanedCodes,
+                );
+                await incrementMultipleStickers(profileId, cleanedCodes);
+
+                // Clasificamos los resultados
+                const nuevas = evaluation
+                  .filter((item) => item.isNew)
+                  .map((item) => item.id);
+                const repetidas = evaluation
+                  .filter((item) => !item.isNew)
+                  .map((item) => item.id);
+
+                let alertMessage = "";
+                if (nuevas.length > 0)
+                  alertMessage += `✨ *${nuevas.length} PARA PEGAR:* \n${nuevas.join(", ")}\n\n`;
+                if (repetidas.length > 0)
+                  alertMessage += `🔁 *${repetidas.length} REPETIDAS:* \n${repetidas.join(", ")}`;
+
+                setProcessingState("IDLE");
+
+                // Mostramos el veredicto y al tocar OK volvemos a la pantalla anterior
+                Alert.alert("¡Escaneo Exitoso! 🎉", alertMessage, [
+                  {
+                    text: "OK",
+                    onPress: () => router.back(),
+                  },
+                ]);
+              } catch (error) {
+                setProcessingState("IDLE");
+                console.error("Error guardando figuritas:", error);
+                Alert.alert(
+                  "Error",
+                  "Hubo un problema guardando en la base de datos.",
+                );
+              }
+            },
           },
-        },
-        { text: "Scan again", style: "cancel" },
-      ]);
+          { text: "Escanear de nuevo", style: "cancel" },
+        ],
+      );
     } catch (error) {
-      setIsProcessing(false);
-      console.error("Error processing image:", error);
-      Alert.alert("Error", "There was a problem scanning the image.");
+      setProcessingState("IDLE");
+      console.error("Error procesando la imagen:", error);
+      Alert.alert("Error", "Hubo un error al procesar la imagen.");
     }
   };
 
-  // Cyber Dark Theme for the Permissions Screen fallback
   if (!hasPermission) {
     return (
       <View style={styles.centerContainer}>
@@ -97,7 +176,6 @@ export default function ScannerScreen() {
     );
   }
 
-  // Cyber Dark Theme for the Missing Camera Screen fallback
   if (device == null) {
     return (
       <View style={styles.centerContainer}>
@@ -121,23 +199,31 @@ export default function ScannerScreen() {
         photo={true}
       />
 
-      {/* Cyber Loading Overlay */}
-      {isProcessing && (
+      {/* Cyber Loading Overlay Dinámico */}
+      {processingState !== "IDLE" && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#0ea5e9" />
-          <Text style={styles.loadingText}>PROCESSING CODES...</Text>
+          <Text style={styles.loadingText}>
+            {processingState === "ANALYZING"
+              ? "PROCESANDO CÓDIGOS..."
+              : "GUARDANDO EN EL ÁLBUM..."}
+          </Text>
           <Text style={styles.loadingSubtext}>
-            Google ML Kit is analyzing the frame
+            {processingState === "ANALYZING"
+              ? "Se está analizando la imagen"
+              : "Calculando repetidas y sincronizando"}
           </Text>
         </View>
       )}
 
-      {/* Visual Guideline HUD - Styled like a tactical targeting reticle */}
-      {!isProcessing && (
+      {/* Visual Guideline HUD */}
+      {processingState === "IDLE" && (
         <View style={styles.hudOverlay}>
-          <Text style={styles.hudTitle}>AIM AT STICKER CODES</Text>
+          <Text style={styles.hudTitle}>
+            APUNTÁ A LOS CÓDIGOS DE ATRÁS DE LAS FIGURITAS
+          </Text>
           <Text style={styles.hudSubtitle}>
-            You can capture multiple codes simultaneously
+            Podés capturar múltiples códigos simultáneamente
           </Text>
           <View style={styles.reticleCornerTL} />
           <View style={styles.reticleCornerTR} />
@@ -147,13 +233,13 @@ export default function ScannerScreen() {
       )}
 
       {/* Bottom Interface Controls */}
-      {!isProcessing && (
+      {processingState === "IDLE" && (
         <View style={styles.bottomControls}>
           <TouchableOpacity
             style={styles.cancelButton}
             onPress={() => router.back()}
           >
-            <Text style={styles.cancelButtonText}>CANCEL</Text>
+            <Text style={styles.cancelButtonText}>CANCELAR</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -167,159 +253,3 @@ export default function ScannerScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  mainContainer: { flex: 1, backgroundColor: "#0f172a" },
-  centerContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#0f172a",
-  },
-  infoText: {
-    fontSize: 14,
-    color: "#94a3b8",
-    fontWeight: "800",
-    letterSpacing: 1,
-  },
-
-  // Tactical HUD Frame
-  hudOverlay: {
-    position: "absolute",
-    top: "25%",
-    alignSelf: "center",
-    backgroundColor: "rgba(30, 41, 59, 0.75)", // Translucent Slate 800
-    borderWidth: 1,
-    borderColor: "rgba(14, 165, 233, 0.3)", // Soft Cyan Glow
-    paddingVertical: 24,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    alignItems: "center",
-    width: "80%",
-    height: 200,
-    justifyContent: "center",
-  },
-  hudTitle: {
-    color: "#0ea5e9",
-    fontSize: 14,
-    fontWeight: "900",
-    letterSpacing: 1.5,
-  },
-  hudSubtitle: {
-    color: "#94a3b8",
-    fontSize: 11,
-    marginTop: 8,
-    textAlign: "center",
-    fontWeight: "600",
-    lineHeight: 16,
-  },
-
-  // Custom Targeting Reticle Corners (Cyber Aesthetic)
-  reticleCornerTL: {
-    position: "absolute",
-    top: 10,
-    left: 10,
-    width: 16,
-    height: 16,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderColor: "#0ea5e9",
-  },
-  reticleCornerTR: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    width: 16,
-    height: 16,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-    borderColor: "#0ea5e9",
-  },
-  reticleCornerBL: {
-    position: "absolute",
-    bottom: 10,
-    left: 10,
-    width: 16,
-    height: 16,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-    borderColor: "#0ea5e9",
-  },
-  reticleCornerBR: {
-    position: "absolute",
-    bottom: 10,
-    right: 10,
-    width: 16,
-    height: 16,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-    borderColor: "#0ea5e9",
-  },
-
-  // Loading Overlay
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(15, 23, 42, 0.95)", // Deep solid Slate 900
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    color: "#ffffff",
-    marginTop: 20,
-    fontSize: 14,
-    fontWeight: "900",
-    letterSpacing: 2,
-  },
-  loadingSubtext: {
-    color: "#64748b",
-    fontSize: 12,
-    marginTop: 6,
-    fontWeight: "600",
-  },
-
-  // Controls Area
-  bottomControls: {
-    position: "absolute",
-    bottom: 50,
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 32,
-  },
-  cancelButton: {
-    position: "absolute",
-    left: 40,
-    backgroundColor: "rgba(30, 41, 59, 0.8)",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#334155",
-  },
-  cancelButtonText: {
-    color: "#94a3b8",
-    fontWeight: "800",
-    fontSize: 11,
-    letterSpacing: 1,
-  },
-
-  // Tactical Capture Shutter (Centered correctly)
-  captureButton: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    borderWidth: 4,
-    borderColor: "#0ea5e9", // Cyber Cyan ring
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "transparent",
-  },
-  captureButtonInner: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    backgroundColor: "#0ea5e9",
-  },
-});

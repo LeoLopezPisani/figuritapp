@@ -197,3 +197,35 @@ export async function incrementMultipleStickers(
     if (row) syncToCloud(userId, id, row.count);
   }
 }
+
+export interface ScanResult {
+  id: string;
+  isNew: boolean;
+}
+
+export async function checkScannedStickers(
+  userId: string,
+  stickerIds: string[],
+): Promise<ScanResult[]> {
+  const db = await getDB();
+
+  const placeholders = stickerIds.map(() => "?").join(",");
+
+  const query = `SELECT sticker_id, count FROM stickers WHERE user_id = ? AND sticker_id IN (${placeholders});`;
+
+  const rows: any[] = await db.getAllAsync(query, userId, ...stickerIds);
+
+  // mapa en memoria [id -> count] para cruzar los datos rápido
+  const currentCounts = new Map<string, number>(
+    rows.map((r) => [r.sticker_id, r.count]),
+  );
+
+  // Mapeo el array original para devolver el veredicto
+  return stickerIds.map((id) => {
+    const currentCount = currentCounts.get(id) || 0;
+    return {
+      id,
+      isNew: currentCount === 0,
+    };
+  });
+}

@@ -1,149 +1,54 @@
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+/**
+ * =========================================================
+ *                     FIGURITAPP v2.0.0
+ * =========================================================
+ *  Created by  : [Leo López Pisani]
+ *  Year        : 2026
+ *  Tech Stack  : React Native, Expo Router, SQLite, Supabase
+ *  Description : Álbum Tracker para el Mundial FIFA 2026.
+ * =========================================================
+ */
+
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   SectionList,
   Share,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { CountryFlag } from "../components/country-flag";
 import {
-  Country,
-  getAlbumData,
-  incrementMultipleStickers,
-  pullCloudData,
-  seedUserAlbum,
-} from "../services/db";
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { CountryCard } from "../components/country-card";
+import { SHARING_FLAGS, ShareType } from "../constants/sharing";
+import { useAlbumSync } from "../hooks/use-album-sync";
+import { Country, getAlbumData } from "../services/db";
 import { supabase } from "../services/supabase";
 import { homeStyles as styles } from "../styles/home.styles";
 
-interface SectionData {
-  title: string;
-  data: Array<{ key: string; country: Country }>;
-}
-
 export default function HomeScreen() {
-  const [sections, setSections] = useState<SectionData[]>([]);
+  const insets = useSafeAreaInsets();
+  const { userId, isLoading, sections, stats, refreshData } = useAlbumSync();
   const [activeTab, setActiveTab] = useState("Intro");
-  const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalOwned: 0,
-    totalStickers: 0,
-    percentage: 0,
-  });
 
-  // NEW: Dynamic Authenticated User State from Supabase Secure Token
-  const [userId, setUserId] = useState<string | null>(null);
-
+  const [headerKey, setHeaderKey] = useState(0); // Forzar re-render del header al volver del escáner
   const params = useLocalSearchParams<{ scannedIds?: string }>();
+
   const sectionListRef = useRef<SectionList>(null);
   const tabsListRef = useRef<FlatList>(null);
 
-  const loadAndProcessAlbum = async (authenticatedUid: string) => {
-    try {
-      let dbData = await getAlbumData(authenticatedUid);
-
-      // Edge Case: If the user is authenticated but has no SQLite slots yet (new device/fresh signup)
-      const hasStickersLoaded = Object.values(dbData).some(
-        (c) => c.stickers.length > 0,
-      );
-      if (!hasStickersLoaded) {
-        console.log(
-          `[HomeScreen] Hydrating clean SQLite structural matrix for user: ${authenticatedUid}`,
-        );
-        await seedUserAlbum(authenticatedUid);
-        dbData = await getAlbumData(authenticatedUid); // Re-fetch hydrated rows
-      }
-
-      let computedTotal = 0;
-      let computedOwned = 0;
-      const groupsMap: Record<string, any[]> = {};
-
-      Object.entries(dbData).forEach(([key, country]) => {
-        computedTotal += country.stickers.length;
-        computedOwned += country.stickers.filter((s) => s.count > 0).length;
-
-        if (!groupsMap[country.group]) groupsMap[country.group] = [];
-        groupsMap[country.group].push({ key, country });
-      });
-
-      const formattedSections: SectionData[] = Object.entries(groupsMap).map(
-        ([groupName, items]) => ({
-          title: groupName,
-          data: items.sort(
-            (a, b) => a.country.orderIndex - b.country.orderIndex,
-          ),
-        }),
-      );
-
-      formattedSections.sort((a, b) => {
-        if (a.title === "Intro") return -1;
-        if (b.title === "Intro") return 1;
-        return a.title.localeCompare(b.title);
-      });
-
-      setSections(formattedSections);
-      setStats({
-        totalOwned: computedOwned,
-        totalStickers: computedTotal,
-        percentage:
-          computedTotal > 0
-            ? Math.round((computedOwned / computedTotal) * 100)
-            : 0,
-      });
-    } catch (error) {
-      console.error("[HomeScreen] Error loading context metrics:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // 1. Mount Hook: Resolve secure authenticated user context
-  useEffect(() => {
-    const resolveUserSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.user) {
-        const uid = session.user.id;
-        setUserId(uid);
-
-        // 1. Primero cargamos lo que haya en local
-        await loadAndProcessAlbum(uid);
-
-        // 2. Intentamos traer datos frescos de la nube (Pull Sync)
-        try {
-          await pullCloudData(uid);
-          await loadAndProcessAlbum(uid);
-        } catch (e) {
-          console.log("Modo offline activo, trabajando con datos locales.");
-        }
-      }
-    };
-    resolveUserSession();
-  }, []);
-
-  // 2. Scanner Hook tied to dynamic secure userId state
-  useEffect(() => {
-    if (params.scannedIds && userId) {
-      const processScannedStickers = async () => {
-        const newIds = params.scannedIds!.split(",");
-        try {
-          await incrementMultipleStickers(userId, newIds);
-          await loadAndProcessAlbum(userId);
-        } catch (error) {
-          console.error("[HomeScreen] Error executing batch append:", error);
-        }
-      };
-      processScannedStickers();
-      router.setParams({ scannedIds: undefined });
-    }
-  }, [params.scannedIds, userId]);
+  useFocusEffect(
+    useCallback(() => {
+      setHeaderKey((prev) => prev + 1);
+    }, []),
+  );
 
   const handleTabPress = (title: string, index: number) => {
     setActiveTab(title);
@@ -160,50 +65,94 @@ export default function HomeScreen() {
     });
   };
 
-  // Generator: Compiles the entire album state into a clean WhatsApp-ready text
-  const handleShareTradingList = async () => {
+  const handleSharePress = () => {
+    Alert.alert(
+      "Compartir figuritas 🏆",
+      "¿Qué listado deseas enviar por WhatsApp?",
+      [
+        {
+          text: "Resumen (Solo %)",
+          onPress: () => generateShareText("RESUMEN"),
+        },
+        {
+          text: "Solo Faltantes 🔴",
+          onPress: () => generateShareText("FALTANTES"),
+        },
+        {
+          text: "Solo Repetidas 🟢",
+          onPress: () => generateShareText("REPETIDAS"),
+        },
+        { text: "Cancelar", style: "cancel" },
+      ],
+      { cancelable: true },
+    );
+  };
+
+  // 2. Esta función procesa la base de datos de SQLite y arma el string final
+  const generateShareText = async (type: ShareType) => {
     try {
       const dbData = await getAlbumData(userId!);
       let missingList: string[] = [];
       let duplicatesList: string[] = [];
 
-      // Iterate through all countries to classify stickers
+      // Recorremos todos los países que devolvió SQLite
       Object.entries(dbData).forEach(([code, country]) => {
+        // Obtenemos la bandera corta de nuestro diccionario. Si no existe, usa la genérica
+        const flagLabel = SHARING_FLAGS[code] || `🏳️ ${code}`;
+
+        // Filtramos números faltantes (count === 0)
         const missing = country.stickers
           .filter((s) => s.count === 0)
           .map((s) => s.number);
+
+        // Filtramos repetidas (count > 1) y formateamos como "3(x1)"
         const duplicates = country.stickers
           .filter((s) => s.count > 1)
           .map((s) => `${s.number}(x${s.count - 1})`);
 
-        if (missing.length > 0)
-          missingList.push(`*${country.name}*: ${missing.join(", ")}`);
-        if (duplicates.length > 0)
-          duplicatesList.push(`*${country.name}*: ${duplicates.join(", ")}`);
+        // Si el país tiene faltantes, armamos su línea corta de texto
+        if (missing.length > 0) {
+          missingList.push(`*${flagLabel}*: ${missing.join(", ")}`);
+        }
+        // Si el país tiene repetidas, armamos su línea corta de texto
+        if (duplicates.length > 0) {
+          duplicatesList.push(`*${flagLabel}*: ${duplicates.join(", ")}`);
+        }
       });
 
-      let shareText = `🏆 *MI ÁLBUM MUNDIAL 2026* 🏆\n\n`;
+      // Encabezado global del mensaje (sale siempre sin importar el tipo)
+      let shareText = `🏆 *FIGURITAPP 2026* 🏆\n`;
+      shareText += `📊 *Progreso:* ${stats.owned}/${stats.total} (${Math.round((stats.owned / stats.total) * 100)}%)\n\n`;
 
-      if (duplicatesList.length > 0) {
-        shareText += `🟢 *TENGO REPETIDAS:*\n${duplicatesList.join("\n")}\n\n`;
-      } else {
-        shareText += `🟢 *TENGO REPETIDAS:* Ninguna por ahora.\n\n`;
+      // Evaluación de la estructura según lo que se seleccionó en el Alert.alert
+      if (type === "RESUMEN") {
+        shareText += `¡Seguimos completando el álbum! 🚀`;
       }
 
-      if (missingList.length > 0) {
-        shareText += `🔴 *ME FALTAN:*\n${missingList.join("\n")}`;
-      } else {
-        shareText += `🔴 *ME FALTAN:* ¡Álbum Completo! 🎉`;
+      if (type === "FALTANTES") {
+        shareText += `🔴 *ME FALTAN:*\n`;
+        shareText +=
+          missingList.length > 0
+            ? missingList.join("\n")
+            : "¡Ninguna! Álbum completo 🎉";
       }
 
-      // Open native share sheet (WhatsApp, Telegram, etc.)
+      if (type === "REPETIDAS") {
+        shareText += `🟢 *MIS REPETIDAS (Para cambiar):*\n`;
+        shareText +=
+          duplicatesList.length > 0
+            ? duplicatesList.join("\n")
+            : "Ninguna por ahora 😢";
+      }
+
+      // Desplegamos la sábana nativa del sistema para enviar a WhatsApp
       await Share.share({
         message: shareText,
         title: "Mis Figuritas 2026",
       });
     } catch (error) {
       console.error("[HomeScreen] Error generating share text:", error);
-      Alert.alert("Error", "No se pudo generar el listado.");
+      Alert.alert("Error", "No se pudo generar el listado para compartir.");
     }
   };
 
@@ -224,42 +173,17 @@ export default function HomeScreen() {
   }: {
     item: { key: string; country: Country };
   }) => {
-    const { key, country } = item;
-    const total = country.stickers.length;
-    const owned = country.stickers.filter((s) => s.count > 0).length;
-    const missing = total - owned;
-
     return (
-      <TouchableOpacity
-        style={styles.countryCard}
-        // Secure Parameter passing: forward authenticated token owner reference downstream
-        onPress={() =>
+      <CountryCard
+        countryKey={item.key}
+        country={item.country}
+        onPress={(key) =>
           router.push({
             pathname: "/country/[id]",
             params: { id: key, profileId: userId },
           })
         }
-      >
-        <View style={styles.countryInfo}>
-          <CountryFlag code={key} />
-          <View>
-            <Text style={styles.countryName}>{country.name}</Text>
-            <Text style={styles.countrySub}>
-              {owned} of {total} collected
-            </Text>
-          </View>
-        </View>
-
-        <View
-          style={[styles.missingBadge, missing === 0 && styles.completedBadge]}
-        >
-          <Text
-            style={[styles.missingText, missing === 0 && styles.completedText]}
-          >
-            {missing === 0 ? "COMPLETE" : `${missing} LEFT`}
-          </Text>
-        </View>
-      </TouchableOpacity>
+      />
     );
   };
 
@@ -303,14 +227,20 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.globalHeader}>
+      <View style={styles.topHeaderRow} key={`top-${headerKey}`}>
+        <Image
+          source={require("../../assets/images/icon.png")}
+          style={styles.brandLogo}
+        />
         <Text style={styles.mainTitle}>FIGURITAPP</Text>
-        <View style={styles.topHeaderRow}>
-          <Text style={styles.secondaryTitle}>PANINI - MUNDIAL 2026</Text>
+      </View>
+      <View style={styles.globalHeader} key={`global-${headerKey}`}>
+        <View style={styles.headerRow}>
+          <Text style={styles.secondaryTitle}>MUNDIAL FIFA 2026</Text>
           <View style={styles.headerActions}>
             <TouchableOpacity
               style={styles.shareButton}
-              onPress={handleShareTradingList}
+              onPress={handleSharePress}
             >
               <Text style={styles.shareButtonText}>📤 SHARE</Text>
             </TouchableOpacity>
@@ -327,15 +257,18 @@ export default function HomeScreen() {
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
             <Text style={styles.statNumber}>
-              {stats.totalOwned}/{stats.totalStickers}
+              {stats.owned}/{stats.total}
             </Text>
-            <Text style={styles.statLabel}>STICKERS</Text>
+            <Text style={styles.statLabel}>FIGURITAS</Text>
           </View>
           <View style={styles.statBox}>
             <Text style={[styles.statNumber, { color: "#0ea5e9" }]}>
-              {stats.percentage}%
+              {stats.total > 0
+                ? Math.round((stats.owned / stats.total) * 100)
+                : 0}
+              %
             </Text>
-            <Text style={styles.statLabel}>PROGRESS</Text>
+            <Text style={styles.statLabel}>PROGRESO</Text>
           </View>
         </View>
       </View>
@@ -367,12 +300,12 @@ export default function HomeScreen() {
 
       {/* SCAN FLOAT ACCENT */}
       <TouchableOpacity
-        style={styles.scanButton}
+        style={[styles.scanButton, { bottom: insets.bottom + 30 }]}
         onPress={() =>
           router.push({ pathname: "/scanner", params: { profileId: userId } })
         }
       >
-        <Text style={styles.scanButtonText}>📷 SCAN STICKER</Text>
+        <Text style={styles.scanButtonText}>📷 ESCANEAR</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );

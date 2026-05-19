@@ -1,15 +1,20 @@
 import * as Haptics from "expo-haptics";
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { CountryFlag } from "../../components/country-flag";
+import { StickerItem } from "../../components/sticker-item";
+import { COUNTRY_METADATA } from "../../constants/countries";
 import {
   decrementSticker,
   getAlbumData,
@@ -18,9 +23,10 @@ import {
 } from "../../services/db";
 import { countryStyles as styles } from "../../styles/country.styles";
 
-type FilterType = "ALL" | "MISSING" | "DUPLICATES";
+type FilterType = "TODAS" | "FALTANTES" | "REPETIDAS";
 
 export default function CountryScreen() {
+  const insets = useSafeAreaInsets();
   const { id, profileId } = useLocalSearchParams<{
     id: string;
     profileId: string;
@@ -30,12 +36,58 @@ export default function CountryScreen() {
   const [countryName, setCountryName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
-  // Nuevo estado para los filtros
-  const [activeFilter, setActiveFilter] = useState<FilterType>("ALL");
+  const [activeFilter, setActiveFilter] = useState<FilterType>("TODAS");
 
-  const loadCountryData = async () => {
+  // 1. Armamos el array de códigos ordenados dinámicamente usando el orderIndex de tus metadatos
+  const orderedCountryCodes = useMemo(() => {
+    return Object.keys(COUNTRY_METADATA).sort(
+      (a, b) => COUNTRY_METADATA[a].orderIndex - COUNTRY_METADATA[b].orderIndex,
+    );
+  }, []);
+
+  // 2. Buscamos el índice del país actual (ej: "MEX" -> índice 1)
+  const currentCountryIndex = orderedCountryCodes.indexOf(id || "");
+
+  // 3. Obtenemos los códigos del anterior y siguiente si existen
+  const previousCountryCode =
+    currentCountryIndex > 0
+      ? orderedCountryCodes[currentCountryIndex - 1]
+      : null;
+  const nextCountryCode =
+    currentCountryIndex < orderedCountryCodes.length - 1
+      ? orderedCountryCodes[currentCountryIndex + 1]
+      : null;
+
+  // 4. Función que maneja el reemplazo de pantalla
+  const handleNavigateToCountry = (targetCountryId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    router.replace({
+      pathname: "/country/[id]",
+      params: { id: targetCountryId, profileId },
+    });
+  };
+
+  const filteredStickers = useMemo(() => {
+    let result = stickers;
+
+    if (activeFilter === "FALTANTES")
+      result = stickers.filter((s) => s.count === 0);
+    if (activeFilter === "REPETIDAS")
+      result = stickers.filter((s) => s.count > 1);
+
+    return result.sort((a, b) => {
+      const numA = parseInt(a.number, 10);
+      const numB = parseInt(b.number, 10);
+      return numA - numB;
+    });
+  }, [stickers, activeFilter]);
+
+  const loadCountryData = useCallback(async () => {
     if (!id || !profileId) return;
     try {
+      // setIsLoading(true); //Optional: Show loading spinner when returning from scanner
+
       const allData = await getAlbumData(profileId);
       const countryInfo = allData[id];
 
@@ -48,26 +100,13 @@ export default function CountryScreen() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadCountryData();
   }, [id, profileId]);
 
-  const filteredStickers = useMemo(() => {
-    let result = stickers;
-
-    if (activeFilter === "MISSING")
-      result = stickers.filter((s) => s.count === 0);
-    if (activeFilter === "DUPLICATES")
-      result = stickers.filter((s) => s.count > 1);
-
-    return result.sort((a, b) => {
-      const numA = parseInt(a.number, 10);
-      const numB = parseInt(b.number, 10);
-      return numA - numB;
-    });
-  }, [stickers, activeFilter]);
+  useFocusEffect(
+    useCallback(() => {
+      loadCountryData();
+    }, [loadCountryData]),
+  );
 
   if (isLoading) {
     return (
@@ -132,49 +171,22 @@ export default function CountryScreen() {
   };
 
   const renderStickerItem = ({ item: sticker }: { item: Sticker }) => {
-    let backgroundColor = "#1e293b";
-    let borderColor = "#334155";
-    let textColor = "#64748b";
-
-    if (sticker.count === 1) {
-      backgroundColor = "#0ea5e9";
-      borderColor = "#0ea5e9";
-      textColor = "#ffffff";
-    } else if (sticker.count > 1) {
-      backgroundColor = "#10b981";
-      borderColor = "#10b981";
-      textColor = "#ffffff";
-    }
-
     return (
-      <TouchableOpacity
-        style={[styles.stickerContainer, { backgroundColor, borderColor }]}
-        onPress={() => handleStickerPress(sticker.id)}
-        onLongPress={() => handleStickerLongPress(sticker.id)}
-        delayLongPress={250}
-      >
-        <Text style={[styles.stickerCountryCode, { color: textColor }]}>
-          {id}
-        </Text>
-        <Text style={[styles.stickerNumber, { color: textColor }]}>
-          {sticker.number}
-        </Text>
-
-        {sticker.count > 1 && (
-          <View style={styles.badgeContainer}>
-            <Text style={styles.badgeText}>x{sticker.count}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
+      <StickerItem
+        sticker={sticker}
+        countryCode={id!}
+        onPress={handleStickerPress}
+        onLongPress={handleStickerLongPress}
+      />
     );
   };
 
   const renderEmptyState = () => (
     <View style={styles.emptyStateContainer}>
       <Text style={styles.emptyStateText}>
-        {activeFilter === "DUPLICATES"
-          ? "NO DUPLICATES YET"
-          : "YOU HAVE THEM ALL! 🎉"}
+        {activeFilter === "REPETIDAS"
+          ? "NO HAY REPETIDAS"
+          : "YA LAS CONSEGUISTE TODAS! 🎉"}
       </Text>
     </View>
   );
@@ -198,7 +210,7 @@ export default function CountryScreen() {
         </View>
 
         <Text style={styles.headerSubtitle}>
-          {ownedStickers} OF {totalStickers} COLLECTED
+          {ownedStickers} DE {totalStickers} OBTENIDAS
         </Text>
       </View>
 
@@ -207,51 +219,51 @@ export default function CountryScreen() {
         <TouchableOpacity
           style={[
             styles.filterBtn,
-            activeFilter === "ALL" && styles.filterBtnActive,
+            activeFilter === "TODAS" && styles.filterBtnActive,
           ]}
-          onPress={() => setActiveFilter("ALL")}
+          onPress={() => setActiveFilter("TODAS")}
         >
           <Text
             style={[
               styles.filterText,
-              activeFilter === "ALL" && styles.filterTextActive,
+              activeFilter === "TODAS" && styles.filterTextActive,
             ]}
           >
-            ALL
+            TODAS
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[
             styles.filterBtn,
-            activeFilter === "MISSING" && styles.filterBtnActive,
+            activeFilter === "FALTANTES" && styles.filterBtnActive,
           ]}
-          onPress={() => setActiveFilter("MISSING")}
+          onPress={() => setActiveFilter("FALTANTES")}
         >
           <Text
             style={[
               styles.filterText,
-              activeFilter === "MISSING" && styles.filterTextActive,
+              activeFilter === "FALTANTES" && styles.filterTextActive,
             ]}
           >
-            MISSING
+            FALTANTES
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[
             styles.filterBtn,
-            activeFilter === "DUPLICATES" && styles.filterBtnActive,
+            activeFilter === "REPETIDAS" && styles.filterBtnActive,
           ]}
-          onPress={() => setActiveFilter("DUPLICATES")}
+          onPress={() => setActiveFilter("REPETIDAS")}
         >
           <Text
             style={[
               styles.filterText,
-              activeFilter === "DUPLICATES" && styles.filterTextActive,
+              activeFilter === "REPETIDAS" && styles.filterTextActive,
             ]}
           >
-            DUPLICATES
+            REPETIDAS
           </Text>
         </TouchableOpacity>
       </View>
@@ -265,14 +277,45 @@ export default function CountryScreen() {
         ListEmptyComponent={renderEmptyState}
       />
 
-      <TouchableOpacity
-        style={styles.floatingScanButton}
-        onPress={() =>
-          router.push({ pathname: "/scanner", params: { profileId } })
-        }
-      >
-        <Text style={styles.floatingScanButtonText}>📷 SCAN</Text>
-      </TouchableOpacity>
+      <View style={[styles.bottomActionBar, { bottom: insets.bottom + 30 }]}>
+        {/* Botón Anterior */}
+        <TouchableOpacity
+          style={[
+            styles.navButton,
+            !previousCountryCode && styles.navButtonDisabled,
+          ]}
+          disabled={!previousCountryCode}
+          onPress={() =>
+            previousCountryCode && handleNavigateToCountry(previousCountryCode)
+          }
+        >
+          <Text style={styles.navButtonText}>◀</Text>
+        </TouchableOpacity>
+
+        {/* Botón Central de Escaneo */}
+        <TouchableOpacity
+          style={styles.floatingScanButton}
+          onPress={() =>
+            router.push({ pathname: "/scanner", params: { profileId } })
+          }
+        >
+          <Text style={styles.floatingScanButtonText}>📷 ESCANEAR</Text>
+        </TouchableOpacity>
+
+        {/* Botón Siguiente */}
+        <TouchableOpacity
+          style={[
+            styles.navButton,
+            !nextCountryCode && styles.navButtonDisabled,
+          ]}
+          disabled={!nextCountryCode}
+          onPress={() =>
+            nextCountryCode && handleNavigateToCountry(nextCountryCode)
+          }
+        >
+          <Text style={styles.navButtonText}>▶</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }

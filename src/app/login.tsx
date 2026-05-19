@@ -1,80 +1,127 @@
+import { Ionicons } from "@expo/vector-icons";
+import * as Application from "expo-application";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../services/supabase";
+import { loginStyles as styles } from "../styles/login.styles";
+
+type LoginStep = "LOGIN" | "FORGOT_PASSWORD" | "RESET_PASSWORD";
 
 export default function LoginScreen() {
+  const [step, setStep] = useState<LoginStep>("LOGIN");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [otpCode, setOtpCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  // Authentication: Secure Login
   const handleLogin = async () => {
     if (!email || !password)
-      return Alert.alert("Error", "Please fill in all fields");
-
+      return Alert.alert("Error", "Completá todos los campos.");
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     setLoading(false);
-
-    if (error) {
-      Alert.alert("Authentication Failed", error.message);
-    } else {
-      // Success: Navigate securely to the app core dashboard
-      router.replace("/");
-    }
+    if (error) Alert.alert("Error", error.message);
+    else router.replace("/");
   };
 
-  // Authentication: Secure Encrypted Sign Up
   const handleSignUp = async () => {
     if (!email || !password)
-      return Alert.alert("Error", "Please fill in all fields");
+      return Alert.alert("Error", "Completá todos los campos.");
     if (password.length < 6)
-      return Alert.alert(
-        "Weak Password",
-        "Password must be at least 6 characters",
-      );
-
+      return Alert.alert("Error", "Mínimo 6 caracteres.");
     setLoading(true);
-    const { error, data } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signUp({ email, password });
+    setLoading(false);
+    if (error) Alert.alert("Error", error.message);
+    else
+      Alert.alert("¡Cuenta Creada!", "Ya podés iniciar sesión con tus datos.");
+  };
+
+  const handleSendResetCode = async () => {
+    if (!email)
+      return Alert.alert("Error", "Ingresá tu correo para enviarte el código.");
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
     setLoading(false);
 
     if (error) {
-      Alert.alert("Registration Failed", error.message);
+      Alert.alert("Error", error.message);
     } else {
       Alert.alert(
-        "Account Created!",
-        "Your profile is encrypted and ready. You can now log in securely.",
+        "Código enviado",
+        "Revisá tu correo. Te enviamos un código de 8 dígitos.",
       );
+      setStep("RESET_PASSWORD");
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!otpCode || !password)
+      return Alert.alert("Error", "Completá el código y tu nueva contraseña.");
+    if (password.length < 6)
+      return Alert.alert(
+        "Error",
+        "La nueva contraseña debe tener al menos 6 caracteres.",
+      );
+
+    setLoading(true);
+
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token: otpCode,
+      type: "recovery",
+    });
+
+    if (error) {
+      setLoading(false);
+      return Alert.alert("Error", "Código inválido o expirado.");
+    }
+
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+
+    if (updateError) {
+      setLoading(false);
+      Alert.alert("Error", "No se pudo guardar la nueva contraseña.");
+    } else {
+      Alert.alert("¡Éxito!", "Tu contraseña fue actualizada.");
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.brandWrapper}>
-        <Text style={styles.brandTrophy}>🏆</Text>
+        <Image
+          source={require("../../assets/images/icon.png")}
+          style={styles.brandLogo}
+        />
         <Text style={styles.brandTitle}>FIGURITAPP</Text>
-        <Text style={styles.brandSubtitle}>SECURE ALBUM MANAGER 2026</Text>
+        <Text style={styles.brandSubtitle}>
+          {step === "LOGIN"
+            ? "GESTOR SEGURO DEL ÁLBUM DEL MUNDIAL 2026"
+            : "RECUPERACIÓN DE CUENTA"}
+        </Text>
       </View>
 
       <View style={styles.formContainer}>
-        {/* Email Input */}
-        <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
+        <Text style={styles.inputLabel}>CORREO ELECTRÓNICO</Text>
         <TextInput
           style={styles.inputField}
-          placeholder="Enter your email"
+          placeholder="tu@correo.com"
           placeholderTextColor="#475569"
           value={email}
           onChangeText={setEmail}
@@ -82,123 +129,147 @@ export default function LoginScreen() {
           keyboardType="email-address"
         />
 
-        {/* Password Input */}
-        <Text style={[styles.inputLabel, { marginTop: 16 }]}>PASSWORD</Text>
-        <TextInput
-          style={styles.inputField}
-          placeholder="••••••••"
-          placeholderTextColor="#475569"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoCapitalize="none"
-        />
+        {step === "LOGIN" && (
+          <>
+            <Text style={[styles.inputLabel, { marginTop: 16 }]}>
+              CONTRASEÑA
+            </Text>
+            <View style={{ position: "relative", justifyContent: "center" }}>
+              <TextInput
+                style={[styles.inputField, { paddingRight: 40 }]} // Espacio extra a la derecha para que el texto no pise al ojito
+                placeholder="••••••••"
+                placeholderTextColor="#475569"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword} // Acá está la magia
+              />
+              <TouchableOpacity
+                style={{ position: "absolute", right: 12 }}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <Ionicons
+                  name={showPassword ? "eye-off" : "eye"}
+                  size={20}
+                  color="#94a3b8"
+                />
+              </TouchableOpacity>
+            </View>
 
-        {loading ? (
-          <ActivityIndicator
-            size="small"
-            color="#0ea5e9"
-            style={{ marginTop: 32 }}
-          />
-        ) : (
+            {loading ? (
+              <ActivityIndicator
+                size="small"
+                color="#0ea5e9"
+                style={{ marginTop: 32 }}
+              />
+            ) : (
+              <View style={styles.actionsWrapper}>
+                <TouchableOpacity
+                  style={styles.primaryButton}
+                  onPress={handleLogin}
+                >
+                  <Text style={styles.primaryButtonText}>INICIAR SESIÓN</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.secondaryButton}
+                  onPress={handleSignUp}
+                >
+                  <Text style={styles.secondaryButtonText}>CREAR CUENTA</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => setStep("FORGOT_PASSWORD")}>
+                  <Text style={styles.textLink}>¿Olvidaste tu contraseña?</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
+        )}
+
+        {step === "FORGOT_PASSWORD" && (
           <View style={styles.actionsWrapper}>
-            {/* Login Button */}
-            <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={handleLogin}
-            >
-              <Text style={styles.primaryButtonText}>SIGN IN</Text>
-            </TouchableOpacity>
-
-            {/* Create Account Link Component */}
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={handleSignUp}
-            >
-              <Text style={styles.secondaryButtonText}>
-                CREATE SECURE ACCOUNT
-              </Text>
-            </TouchableOpacity>
+            {loading ? (
+              <ActivityIndicator size="small" color="#0ea5e9" />
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={styles.primaryButton}
+                  onPress={handleSendResetCode}
+                >
+                  <Text style={styles.primaryButtonText}>ENVIAR CÓDIGO</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setStep("LOGIN")}>
+                  <Text style={styles.textLink}>Volver al inicio</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         )}
+
+        {step === "RESET_PASSWORD" && (
+          <>
+            <Text style={[styles.inputLabel, { marginTop: 16 }]}>
+              CÓDIGO DE 8 DÍGITOS
+            </Text>
+            <TextInput
+              style={styles.inputField}
+              placeholder="12345678"
+              placeholderTextColor="#475569"
+              value={otpCode}
+              onChangeText={setOtpCode}
+              keyboardType="number-pad"
+              maxLength={8}
+            />
+
+            <Text style={[styles.inputLabel, { marginTop: 16 }]}>
+              NUEVA CONTRASEÑA
+            </Text>
+            <View style={{ position: "relative", justifyContent: "center" }}>
+              <TextInput
+                style={[styles.inputField, { paddingRight: 40 }]} // Espacio extra a la derecha para que el texto no pise al ojito
+                placeholder="••••••••"
+                placeholderTextColor="#475569"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword} // Acá está la magia
+              />
+              <TouchableOpacity
+                style={{ position: "absolute", right: 12 }}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <Ionicons
+                  name={showPassword ? "eye-off" : "eye"}
+                  size={20}
+                  color="#94a3b8"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.actionsWrapper}>
+              {loading ? (
+                <ActivityIndicator size="small" color="#0ea5e9" />
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={styles.primaryButton}
+                    onPress={handleResetPassword}
+                  >
+                    <Text style={styles.primaryButtonText}>
+                      GUARDAR CONTRASEÑA
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setStep("LOGIN")}>
+                    <Text style={styles.textLink}>Cancelar</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </>
+        )}
       </View>
+      <Text style={styles.versionText}>
+        v{Application.nativeApplicationVersion} (
+        {Application.nativeBuildVersion}) — by [LP Bros] 💻 Cowabunga!
+      </Text>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0f172a",
-    justifyContent: "center",
-    paddingHorizontal: 32,
-  },
-  brandWrapper: { alignItems: "center", marginBottom: 40 },
-  brandTrophy: { fontSize: 44, marginBottom: 12 },
-  brandTitle: {
-    fontSize: 24,
-    fontWeight: "900",
-    color: "#ffffff",
-    letterSpacing: 2,
-  },
-  brandSubtitle: {
-    fontSize: 10,
-    color: "#0ea5e9",
-    fontWeight: "800",
-    marginTop: 4,
-    letterSpacing: 1.5,
-  },
-
-  formContainer: {
-    backgroundColor: "#1e293b",
-    padding: 24,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#334155",
-  },
-  inputLabel: {
-    color: "#64748b",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  inputField: {
-    backgroundColor: "#0f172a",
-    color: "#ffffff",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#334155",
-    fontSize: 14,
-  },
-  actionsWrapper: { marginTop: 24, gap: 12 },
-  primaryButton: {
-    backgroundColor: "#0ea5e9",
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: "center",
-    shadowColor: "#0ea5e9",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "900",
-    letterSpacing: 1,
-  },
-  secondaryButton: {
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  secondaryButtonText: {
-    color: "#64748b",
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-  },
-});

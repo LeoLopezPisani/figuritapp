@@ -136,25 +136,51 @@ export const countryStyles = StyleSheet.create({
     borderColor: "#0f172a",
   },
   badgeText: { color: "#ffffff", fontSize: 9, fontWeight: "900" },
-
-  floatingScanButton: {
-    position: "absolute",
-    bottom: 30,
-    alignSelf: "center",
-    backgroundColor: "#0ea5e9",
-    paddingVertical: 16,
-    paddingHorizontal: 40,
-    borderRadius: 30,
-    elevation: 8,
-    shadowColor: "#0ea5e9",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-  },
   floatingScanButtonText: {
     color: "#ffffff",
     fontSize: 15,
     fontWeight: "900",
     letterSpacing: 1,
+  },
+  bottomActionBar: {
+    position: "absolute",
+    left: 20,
+    right: 20,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "transparent",
+  },
+  floatingScanButton: {
+    flex: 1, // Toma el espacio del centro
+    backgroundColor: "#0ea5e9",
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 4, // Sombrita Android
+    shadowColor: "#000", // Sombrita iOS
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  navButton: {
+    width: 50,
+    height: 50,
+    backgroundColor: "#1e293b",
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#334155",
+  },
+  navButtonDisabled: {
+    opacity: 0.3,
+  },
+  navButtonText: {
+    color: "#f8fafc",
+    fontSize: 18,
+    fontWeight: "bold",
   },
 });
