@@ -8,7 +8,6 @@ export const homeStyles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#0f172a",
   },
-
   globalHeader: {
     backgroundColor: "#1e293b",
     paddingTop: 16,
@@ -16,13 +15,6 @@ export const homeStyles = StyleSheet.create({
     paddingHorizontal: 24,
     borderBottomWidth: 1,
     borderColor: "#334155",
-  },
-  topHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#061329",
-    height: 50,
   },
   headerRow: {
     flexDirection: "row",
@@ -47,7 +39,80 @@ export const homeStyles = StyleSheet.create({
     color: "#b8afaf",
     fontWeight: "800",
     letterSpacing: 1,
-    marginTop: 4,
+  },
+
+  actionBtnEmoji: {
+    fontSize: 24,
+  },
+  actionBtnTitle: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+  actionBtnSub: {
+    color: "#94a3b8",
+    fontSize: 10,
+  },
+
+  topHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 5,
+  },
+  brandGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  brandSubtitle: {
+    color: "#0ea5e9",
+    fontSize: 10,
+    fontWeight: "bold",
+    letterSpacing: 1,
+    marginTop: -2,
+  },
+
+  logoutIconBtn: {
+    padding: 5,
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    borderWidth: 0.5,
+    borderColor: "rgba(239, 68, 68, 0.3)",
+    borderRadius: 8,
+  },
+  logoutIconText: {
+    fontSize: 14,
+    color: "#ef44448f",
+  },
+
+  dashboardActions: {
+    flexDirection: "row",
+    marginTop: 12,
+    gap: 12,
+  },
+  actionPill: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(30, 41, 59, 0.5)",
+    borderWidth: 1,
+    borderColor: "#334155",
+    borderRadius: 10,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  actionPillEmoji: {
+    fontSize: 16,
+  },
+  actionPillTitle: {
+    color: "#f8fafc",
+    fontSize: 13,
+    fontWeight: "bold",
+    letterSpacing: 0.5,
   },
 
   headerActions: { flexDirection: "row", gap: 8 },
@@ -80,30 +145,52 @@ export const homeStyles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  statsRow: { flexDirection: "row", justifyContent: "space-around" },
-  statBox: { alignItems: "center" },
-  statNumber: {
-    fontSize: 26,
-    fontWeight: "bold",
-    color: "#ffffff",
-    letterSpacing: 0.5,
+  compactStatsContainer: {
+    marginBottom: 4,
   },
-  statLabel: {
-    fontSize: 10,
-    color: "#64748b",
-    marginTop: 4,
-    fontWeight: "800",
-    letterSpacing: 1,
+  statsTextRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    marginBottom: 6,
+    paddingHorizontal: 2,
+  },
+  statsMainText: {
+    color: "#94a3b8",
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  statsHighlight: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  statsPercentage: {
+    color: "#0ea5e9",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  progressBarBg: {
+    height: 6,
+    backgroundColor: "rgba(30, 41, 59, 0.5)",
+    borderRadius: 3,
+    overflow: "hidden",
+    borderWidth: 0.5,
+    borderColor: "#334155",
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: "#0ea5e9",
+    borderRadius: 3,
   },
 
-  // Slider elevado para separar visualmente
   sliderWrapper: {
     backgroundColor: "#1e293b",
     borderBottomWidth: 1,
     borderColor: "#334155",
     paddingVertical: 12,
-    elevation: 4, // Sombra en Android
-    shadowColor: "#000", // Sombra en iOS
+    elevation: 4,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
@@ -127,23 +214,23 @@ export const homeStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "bold",
     letterSpacing: 0.5,
+    textAlign: "center",
   },
   tabButtonTextActive: { color: "#0ea5e9" },
 
   sectionHeaderContainer: {
-    paddingVertical: 8,
+    paddingVertical: 12,
     marginTop: 20,
     marginBottom: 10,
   },
   sectionHeaderTitle: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "900",
     color: "#0ea5e9",
-    letterSpacing: 2,
+    letterSpacing: 1,
   },
 
-  // FIX DE ESPACIADO: paddingTop agregado para separar FWC del header
-  listContainer: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 110 },
+  listContainer: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 200 },
 
   countryCard: {
     backgroundColor: "#1e293b",
@@ -198,5 +285,20 @@ export const homeStyles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "900",
     letterSpacing: 1,
+  },
+
+  tinyFlagsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    marginTop: 4,
+  },
+  tinyFlag: {
+    width: 16,
+    height: 12,
+    borderRadius: 2,
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.2)",
   },
 });

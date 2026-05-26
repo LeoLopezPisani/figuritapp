@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Camera,
   useCameraDevice,
@@ -17,23 +18,25 @@ import {
 import { OCR_DICTIONARY, STICKER_REGEX } from "../constants/scanner";
 import {
   checkScannedStickers,
+  decrementMultipleStickers,
   incrementMultipleStickers,
 } from "../services/db"; // <-- Tus nuevos poderes de SQLite
 import { scannerStyles as styles } from "../styles/scanner.styles";
 
 type ProcessingState = "IDLE" | "ANALYZING" | "SAVING";
+type ScanMode = "ADD" | "SUBTRACT";
 
 export default function ScannerScreen() {
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice("back");
   const cameraRef = useRef<Camera>(null);
+  const insets = useSafeAreaInsets();
 
-  // Recibimos el ID del usuario directamente desde la URL de la ruta
   const { profileId } = useLocalSearchParams<{ profileId: string }>();
 
-  // Estado mejorado para darle feedback preciso al usuario
   const [processingState, setProcessingState] =
     useState<ProcessingState>("IDLE");
+  const [scanMode, setScanMode] = useState<ScanMode>("ADD");
 
   useEffect(() => {
     if (!hasPermission) {
@@ -47,10 +50,7 @@ export default function ScannerScreen() {
     try {
       setProcessingState("ANALYZING");
 
-      // 1. Capture high-res photo
       const photo = await cameraRef.current.takePhoto({ flash: "off" });
-
-      // 2. Process local file path with ML Kit OCR
       const result = await TextRecognition.recognize(`file://${photo.path}`);
       setProcessingState("IDLE");
 
@@ -62,8 +62,7 @@ export default function ScannerScreen() {
         return;
       }
 
-      const upperCaseText = result.text.toUpperCase();
-      const matches = upperCaseText.match(STICKER_REGEX);
+      const matches = result.text.toUpperCase().match(STICKER_REGEX);
 
       if (!matches || matches.length === 0) {
         Alert.alert(
@@ -96,13 +95,17 @@ export default function ScannerScreen() {
         return;
       }
 
+      const alertTitle =
+        scanMode === "ADD" ? "¡Nuevas Figuritas!" : "¡Figuritas a Entregar!";
+      const alertAction = scanMode === "ADD" ? "Agregar al álbum" : "Descontar";
+
       // 3. Confirmación y Lógica de Base de Datos Local
       Alert.alert(
-        "¡Figuritas Detectadas!",
+        alertTitle,
         `${cleanedCodes.length} códigos encontrados -> ${cleanedCodes.join(", ")}`,
         [
           {
-            text: "Agregar al álbum",
+            text: alertAction,
             onPress: async () => {
               if (!profileId) {
                 Alert.alert("Error", "No se encontró la sesión del usuario.");
@@ -110,39 +113,102 @@ export default function ScannerScreen() {
               }
 
               try {
-                // Volvemos a prender el HUD, esta vez en modo "Guardando"
                 setProcessingState("SAVING");
 
-                // Evaluamos y guardamos usando las funciones que preparamos
-                const evaluation = await checkScannedStickers(
-                  profileId,
-                  cleanedCodes,
-                );
-                await incrementMultipleStickers(profileId, cleanedCodes);
+                if (scanMode === "ADD") {
+                  const evaluation = await checkScannedStickers(
+                    profileId,
+                    cleanedCodes,
+                  );
+                  await incrementMultipleStickers(profileId, cleanedCodes);
 
-                // Clasificamos los resultados
-                const nuevas = evaluation
-                  .filter((item) => item.isNew)
-                  .map((item) => item.id);
-                const repetidas = evaluation
-                  .filter((item) => !item.isNew)
-                  .map((item) => item.id);
+                  const nuevas = evaluation
+                    .filter((item) => item.isNew)
+                    .map((item) => item.id);
+                  const repetidas = evaluation
+                    .filter((item) => !item.isNew)
+                    .map((item) => item.id);
 
-                let alertMessage = "";
-                if (nuevas.length > 0)
-                  alertMessage += `✨ *${nuevas.length} PARA PEGAR:* \n${nuevas.join(", ")}\n\n`;
-                if (repetidas.length > 0)
-                  alertMessage += `🔁 *${repetidas.length} REPETIDAS:* \n${repetidas.join(", ")}`;
+                  let alertMessage = "";
+                  if (nuevas.length > 0)
+                    alertMessage += `✨ *${nuevas.length} PARA PEGAR:* \n${nuevas.join(", ")}\n\n`;
+                  if (repetidas.length > 0)
+                    alertMessage += `🔁 *${repetidas.length} REPETIDAS:* \n${repetidas.join(", ")}`;
 
-                setProcessingState("IDLE");
+                  setProcessingState("IDLE");
+                  Alert.alert("¡Escaneo Exitoso! 🎉", alertMessage, [
+                    { text: "OK", onPress: () => router.back() },
+                  ]);
+                } else {
+                  const evaluation = await checkScannedStickers(
+                    profileId,
+                    cleanedCodes,
+                  );
 
-                // Mostramos el veredicto y al tocar OK volvemos a la pantalla anterior
-                Alert.alert("¡Escaneo Exitoso! 🎉", alertMessage, [
-                  {
-                    text: "OK",
-                    onPress: () => router.back(),
-                  },
-                ]);
+                  const sinStock = evaluation
+                    .filter((item) => item.count === 0)
+                    .map((item) => item.id);
+                  const ultimaCopia = evaluation
+                    .filter((item) => item.count === 1)
+                    .map((item) => item.id);
+                  const repetidasSeguras = evaluation
+                    .filter((item) => item.count > 1)
+                    .map((item) => item.id);
+
+                  const validasParaDescontar = [
+                    ...ultimaCopia,
+                    ...repetidasSeguras,
+                  ];
+
+                  if (validasParaDescontar.length === 0) {
+                    setProcessingState("IDLE");
+                    Alert.alert(
+                      "Sin Cambios",
+                      `⚠️ *NO TENÍAS:*\n${sinStock.join(", ")}`,
+                      [{ text: "OK" }],
+                    );
+                    return;
+                  }
+
+                  const ejecutarDescuento = async () => {
+                    await decrementMultipleStickers(
+                      profileId,
+                      validasParaDescontar,
+                    );
+
+                    let alertMessage = "";
+                    if (validasParaDescontar.length > 0)
+                      alertMessage += `✅ *DESCONTADAS:*\n${validasParaDescontar.join(", ")}\n\n`;
+                    if (sinStock.length > 0)
+                      alertMessage += `⚠️ *NO TENÍAS (Ignoradas):*\n${sinStock.join(", ")}\n`;
+
+                    setProcessingState("IDLE");
+                    Alert.alert("¡Stock Actualizado! 📤", alertMessage, [
+                      { text: "OK", onPress: () => router.back() },
+                    ]);
+                  };
+
+                  if (ultimaCopia.length > 0) {
+                    setProcessingState("IDLE");
+                    Alert.alert(
+                      "¡Atención! Última copia",
+                      `Estás por entregar figuritas de las que NO tenés repetidas:\n\n${ultimaCopia.join(", ")}\n\nVan a volver a aparecer como FALTANTES en tu álbum. ¿Querés descontarlas igual?`,
+                      [
+                        { text: "Cancelar", style: "cancel" },
+                        {
+                          text: "Sí, descontar",
+                          style: "destructive",
+                          onPress: () => {
+                            setProcessingState("SAVING");
+                            ejecutarDescuento();
+                          },
+                        },
+                      ],
+                    );
+                  } else {
+                    await ejecutarDescuento();
+                  }
+                }
               } catch (error) {
                 setProcessingState("IDLE");
                 console.error("Error guardando figuritas:", error);
@@ -199,6 +265,45 @@ export default function ScannerScreen() {
         photo={true}
       />
 
+      {/* SELECTOR DE MODO SUPERIOR */}
+      {processingState === "IDLE" && (
+        <View style={[styles.modeSelectorContainer, { top: insets.top + 20 }]}>
+          <TouchableOpacity
+            style={[
+              styles.modeButton,
+              scanMode === "ADD" && styles.modeButtonActiveAdd,
+            ]}
+            onPress={() => setScanMode("ADD")}
+          >
+            <Text
+              style={[
+                styles.modeText,
+                scanMode === "ADD" && styles.modeTextActive,
+              ]}
+            >
+              📥 AGREGAR
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.modeButton,
+              scanMode === "SUBTRACT" && styles.modeButtonActiveSubtract,
+            ]}
+            onPress={() => setScanMode("SUBTRACT")}
+          >
+            <Text
+              style={[
+                styles.modeText,
+                scanMode === "SUBTRACT" && styles.modeTextActive,
+              ]}
+            >
+              📤 QUITAR
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Cyber Loading Overlay Dinámico */}
       {processingState !== "IDLE" && (
         <View style={styles.loadingOverlay}>
@@ -246,7 +351,12 @@ export default function ScannerScreen() {
             style={styles.captureButton}
             onPress={handleCapture}
           >
-            <View style={styles.captureButtonInner} />
+            <View
+              style={[
+                styles.captureButtonInner,
+                scanMode === "SUBTRACT" && { backgroundColor: "#ef4444" },
+              ]}
+            />
           </TouchableOpacity>
         </View>
       )}

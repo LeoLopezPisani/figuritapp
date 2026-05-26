@@ -198,9 +198,30 @@ export async function incrementMultipleStickers(
   }
 }
 
+export async function decrementMultipleStickers(
+  userId: string,
+  stickerIds: string[],
+): Promise<void> {
+  const db = await getDB();
+  for (const id of stickerIds) {
+    await db.runAsync(
+      "UPDATE stickers SET count = CASE WHEN count > 0 THEN count - 1 ELSE 0 END WHERE user_id = ? AND sticker_id = ?;",
+      userId,
+      id,
+    );
+    const row: any = await db.getFirstAsync(
+      "SELECT count FROM stickers WHERE user_id = ? AND sticker_id = ?",
+      userId,
+      id,
+    );
+    if (row) syncToCloud(userId, id, row.count);
+  }
+}
+
 export interface ScanResult {
   id: string;
   isNew: boolean;
+  count: number;
 }
 
 export async function checkScannedStickers(
@@ -208,24 +229,20 @@ export async function checkScannedStickers(
   stickerIds: string[],
 ): Promise<ScanResult[]> {
   const db = await getDB();
-
   const placeholders = stickerIds.map(() => "?").join(",");
-
   const query = `SELECT sticker_id, count FROM stickers WHERE user_id = ? AND sticker_id IN (${placeholders});`;
-
   const rows: any[] = await db.getAllAsync(query, userId, ...stickerIds);
 
-  // mapa en memoria [id -> count] para cruzar los datos rápido
   const currentCounts = new Map<string, number>(
     rows.map((r) => [r.sticker_id, r.count]),
   );
 
-  // Mapeo el array original para devolver el veredicto
   return stickerIds.map((id) => {
     const currentCount = currentCounts.get(id) || 0;
     return {
       id,
       isNew: currentCount === 0,
+      count: currentCount,
     };
   });
 }

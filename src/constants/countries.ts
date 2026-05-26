@@ -1,5 +1,3 @@
-// src/constants/countries.ts
-
 export interface CountryMeta {
   name: string;
   group: string;
