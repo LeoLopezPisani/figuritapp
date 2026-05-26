@@ -3,6 +3,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
   FlatList,
   Text,
   TouchableOpacity,
@@ -108,6 +109,30 @@ export default function CountryScreen() {
     }, [loadCountryData]),
   );
 
+  const handleGoHome = () => {
+    router.navigate({
+      pathname: "/",
+      params: { lastViewedCountry: id },
+    });
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        handleGoHome();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      // Limpiamos el evento cuando nos vamos de la pantalla
+      return () => subscription.remove();
+    }, [handleGoHome]),
+  );
+
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
@@ -120,10 +145,7 @@ export default function CountryScreen() {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.errorText}>Country section not found</Text>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={handleGoHome}>
           <Text style={styles.backButtonText}>GO BACK</Text>
         </TouchableOpacity>
       </View>
@@ -199,7 +221,7 @@ export default function CountryScreen() {
       <View style={styles.headerContainer}>
         <TouchableOpacity
           style={styles.headerBackButton}
-          onPress={() => router.back()}
+          onPress={handleGoHome}
         >
           <Text style={styles.headerBackButtonText}>⬅ HOME</Text>
         </TouchableOpacity>

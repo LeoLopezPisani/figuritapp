@@ -4,6 +4,11 @@ interface CountryFlagProps {
   code: string;
 }
 
+interface CountryFlagProps {
+  code: string;
+  variant?: "default" | "tiny"; // <-- Agregamos la variante
+}
+
 // Static mapping required by Metro Bundler for local assets
 const FLAG_ASSETS: Record<string, any> = {
   FWC: require("../../assets/flags/fwc.png"),
@@ -80,17 +85,22 @@ const FLAG_ASSETS: Record<string, any> = {
   PAN: require("../../assets/flags/pa.png"),
 };
 
-export function CountryFlag({ code }: CountryFlagProps) {
+export function CountryFlag({ code, variant = "default" }: CountryFlagProps) {
+  const isTiny = variant === "tiny";
+  const wrapperStyle = isTiny ? styles.tinyImageWrapper : styles.imageWrapper;
+
   if (!FLAG_ASSETS[code]) {
     return (
-      <View style={[styles.flagWrapper, styles.fallbackBackground]}>
-        <Text style={styles.fallbackText}>{code.substring(0, 2)}</Text>
+      <View style={[wrapperStyle, styles.fallbackBackground]}>
+        <Text style={isTiny ? styles.tinyFallbackText : styles.fallbackText}>
+          {code.substring(0, 2)}
+        </Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.imageWrapper}>
+    <View style={wrapperStyle}>
       <Image
         source={FLAG_ASSETS[code]}
         style={styles.flagImage}
@@ -101,31 +111,33 @@ export function CountryFlag({ code }: CountryFlagProps) {
 }
 
 const styles = StyleSheet.create({
+  // Variante Normal (para la vista de país)
   imageWrapper: {
     width: 40,
     height: 30,
     borderRadius: 6,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "#334155", // Slate 700 border for cyber aesthetic
+    borderColor: "#334155",
+  },
+  // Variante Tiny (para el slider)
+  tinyImageWrapper: {
+    width: 16,
+    height: 12,
+    borderRadius: 2,
+    overflow: "hidden",
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.2)",
   },
   flagImage: {
     width: "100%",
     height: "100%",
   },
-  flagWrapper: {
-    width: 40,
-    height: 30,
-    borderRadius: 6,
+  fallbackBackground: {
+    backgroundColor: "#334155",
     justifyContent: "center",
     alignItems: "center",
   },
-  trophyBackground: {
-    backgroundColor: "rgba(234, 179, 8, 0.15)", // Dark cyber gold glow
-    borderWidth: 1,
-    borderColor: "#eab308",
-  },
-  trophyText: { fontSize: 14 },
-  fallbackBackground: { backgroundColor: "#334155" },
   fallbackText: { fontSize: 10, fontWeight: "bold", color: "#94a3b8" },
+  tinyFallbackText: { fontSize: 6, fontWeight: "bold", color: "#94a3b8" },
 });

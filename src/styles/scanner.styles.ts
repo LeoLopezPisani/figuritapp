@@ -154,4 +154,35 @@ export const scannerStyles = StyleSheet.create({
     borderRadius: 33,
     backgroundColor: "#0ea5e9",
   },
+
+  modeSelectorContainer: {
+    position: "absolute",
+    left: 20,
+    right: 20,
+    flexDirection: "row",
+    backgroundColor: "rgba(15, 23, 42, 0.8)",
+    borderRadius: 12,
+    padding: 4,
+    zIndex: 20,
+  },
+  modeButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    borderRadius: 8,
+  },
+  modeButtonActiveAdd: {
+    backgroundColor: "#0ea5e9", // Azul para recibir
+  },
+  modeButtonActiveSubtract: {
+    backgroundColor: "#ef4444", // Rojo para entregar
+  },
+  modeText: {
+    color: "#94a3b8",
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  modeTextActive: {
+    color: "#ffffff",
+  },
 });
